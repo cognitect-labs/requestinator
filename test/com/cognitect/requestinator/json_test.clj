@@ -26,6 +26,11 @@
                 [{"op" "remove"
                   "path" "#/foo/baaz"}]))
       "Nested remove")
+  (is (= {"foo" "bar"}
+         (amend {"foo" "bar"}
+                [{"op" "remove"
+                  "path" "#/no/such/path"}]))
+      "Removal of nonexistent node does nothing")
   (is (= {"foo" {"bar" 3
                  "quux" {"bling" true}}}
          (amend {}

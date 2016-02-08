@@ -40,15 +40,32 @@
   (let [{:strs [path value]} amendment]
     (assoc-in doc (path-segments path) value)))
 
+(defn- exists?
+  "Returns true if `segments` is a path-like sequence corresponding to
+  an existing node in `doc`."
+  [doc segments]
+  (loop [[head & more] segments
+         context doc]
+    (cond
+      (not head) true
+
+      (not (map? context)) false
+
+      (contains? context head) (recur more (get context head))
+
+      :else false)))
+
 (defmethod amend* "remove"
   [doc amendment]
   (let [path (get amendment "path")
         segments (path-segments path)
         intermediate (butlast segments)
         final (last segments)]
-    (if (empty? intermediate)
-      (dissoc doc final)
-      (update-in doc intermediate dissoc final))))
+    (if (exists? doc segments)
+      (if (empty? intermediate)
+        (dissoc doc final)
+        (update-in doc intermediate dissoc final))
+      doc)))
 
 (defn amend
   "Amends JSON document `doc` per `amendments`, a sequence of maps
