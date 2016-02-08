@@ -1,6 +1,7 @@
 (ns com.cognitect.requestinator.swagger-test
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io]
+            [clojure.set :as set]
             [clojure.test :refer :all]
             [clojure.test.check.generators :as gen]
             [com.cognitect.requestinator.swagger :refer :all]))
@@ -37,10 +38,10 @@
 
 (defn param-map
   [op method]
-  (->> (params-generator (get petstore-spec "definitions")
+  (->> (params-generator petstore-spec
                          (get-in petstore-spec ["paths" op method "parameters"]))
        gen/generate
-       (map (fn [{:keys [name] :as p}] [name p]))
+       (map (fn [{:strs [name] :as p}] [name p]))
        (into {})))
 
 (defn params-valid?
@@ -52,16 +53,19 @@
 
 (defn valid-pet?
   [pet]
-  ;; TODO
-  false)
+  ;; TODO: Make this better
+  (empty? (set/difference #{"category" "name" "id" "photoUrls"}
+                          (set (keys pet)))))
 
 (deftest param-generator-test
-  (are [op method param-validators]
-      (is (params-valid? (param-map op method) param-validators))
-    ;; Empty parameter list
+  (are [message op method param-validators]
+      (is (params-valid? (param-map op method) param-validators) message)
+    "Empty parameter list"
     "/user/logout" "get" {}
-    ;; Single number param
+
+    "Single number param"
     "/store/order/{orderId}" "get" {"orderId" number?}
-    ;; Schema-described parameter
+
+    "Schema-described parameter"
     "/pet" "put" {"body" valid-pet?}
     ))

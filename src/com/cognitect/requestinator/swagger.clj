@@ -4,7 +4,8 @@
             [clojure.data.json :as json]
             [clojure.string :as str]
             [clojure.test.check :as c]
-            [clojure.test.check.generators :as gen]))
+            [clojure.test.check.generators :as gen]
+            [com.cognitect.requestinator.json :as json-helper]))
 
 ;; TODO:
 ;; - [ ] Support for `required` being false
@@ -14,46 +15,42 @@
 ;; - [ ] References for parameters
 ;; - [ ] Overriding consumes
 
-(defn get-definition
-  [definitions ^String path]
-  (let [leader "#/definitions/"]
-    (when-not (.startsWith path leader)
-      (throw (ex-info "Definition paths not starting with #/defintiions not currently supported."
-                      {:reason :not-yet-implemented
-                       :path path})))
-    (let [selector (subs path (count leader))]
-      (get definitions selector))))
-
 (declare param-value-generator)
 
 (defn object-generator
-  [definitions param]
+  [spec param]
   (let [props (get param "properties")]
     (->> props
          vals
-         (map #(param-value-generator definitions %))
+         (map #(param-value-generator spec %))
          (apply gen/tuple)
          (gen/fmap (fn [vals] (zipmap (keys props) vals))))))
 
 (defn param-value-generator
-  [definitions param]
+  [spec param]
+  ;;  (pr "param: ")
+  ;; (prn param)
   (let [{:strs [$ref type format items in schema enum]} param]
+    ;; (pr "$ref: ")
+    ;; (prn $ref)
+    ;; (pr "spec")
+    ;; (prn spec)
     (cond
       $ref
-      (param-value-generator definitions (get-definition definitions $ref))
+      (param-value-generator spec (json-helper/select spec $ref))
 
       enum
       (gen/elements enum)
 
       (= in "body")
-      (param-value-generator definitions schema)
+      (param-value-generator spec schema)
 
       :else
       (match [type format]
              ["integer" _] gen/int
-             ["array" _]   (gen/vector (param-value-generator definitions items))
+             ["array" _]   (gen/vector (param-value-generator spec items))
              ["string" _]  gen/string
-             ["object" _]  (object-generator definitions param)
+             ["object" _]  (object-generator spec param)
              ["boolean" _] gen/boolean
              ["file" _]    gen/string
              :else (throw (ex-info (clojure.core/format "Parameter generation for %s/%s not yet implmented. Parameter definition: %s"
@@ -67,15 +64,15 @@
                                     :format format}))))))
 
 (defn param-generator
-  [definitions param]
+  [spec param]
   (let [{:strs [in name]} param]
-    (gen/let [v (param-value-generator definitions param)]
+    (gen/let [v (param-value-generator spec param)]
       (assoc param
              :value v))))
 
 (defn params-generator
-  [definitions params]
-  (apply gen/tuple (map #(param-generator definitions %) params)))
+  [spec params]
+  (apply gen/tuple (map #(param-generator spec %) params)))
 
 (defn substitute-path-params
   [uri path-params]
@@ -146,7 +143,7 @@
     {:uri            (substitute-path-params op path)
      :query-string   (build-query-string query)
      :request-method (keyword method)
-     :params         params
+     ::params         params
      :headers        (merge {"content-type" (if (and formData
                                                      (= mime-type "multipart/form-data"))
                                               (str "multipart/form-data; boundary="
@@ -168,7 +165,7 @@
     (gen/let [[op op-description]         (gen/elements paths)
               [method method-description] (gen/elements op-description)
               mime-type                   (gen/elements (get method-description "consumes"))
-              params                      (params-generator definitions
+              params                      (params-generator spec
                                                             (get method-description "parameters"))]
       (request {:op        op
                 :method    method

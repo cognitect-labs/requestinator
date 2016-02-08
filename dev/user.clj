@@ -5,7 +5,8 @@
             [clojure.repl :refer :all]
             [clojure.test.check.generators :as gen]
             [clojure.tools.namespace.repl :refer [refresh refresh-all]]
-            [com.cognitect.requestinator.swagger :refer :all]))
+            [com.cognitect.requestinator.swagger :refer :all]
+            [com.cognitect.requestinator.json :as json-helper]))
 
 (def petstore-spec
   (->> "petstore.swagger.json"
@@ -14,22 +15,20 @@
        slurp
        json/read-str))
 
-(def definitions
-  (get petstore-spec "definitions"))
-
 (def param
   (get-in petstore-spec
           ["paths" "/pet/{petId}" "get" "parameters" 0]))
 
 (defn run-tests
   []
-  (clojure.test/run-tests 'com.cognitect.requestinator.swagger-test))
+  (clojure.test/run-tests 'com.cognitect.requestinator.swagger-test
+                          'com.cognitect.requestinator.json-test))
 
 (defn generate-params
   [spec op method]
   (->> spec
        (get-in spec ["paths" op method "parameters"])
-       (params-generator (get spec "definitions"))
+       (params-generator spec)
        gen/generate))
 
 (defn generate-request
