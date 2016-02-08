@@ -17,7 +17,7 @@
       slurp
       json/read-str))
 
-(gen/sample (request-generator petstore-spec) 3)
+(last (gen/sample (request-generator petstore-spec) 100))
 
 (gen/generate
  (object-generator
@@ -45,7 +45,10 @@
 
 (generate-request {:spec petstore-spec :op "/pet/{petId}/uploadImage" :method "post"})
 
-
 (generate-request {:spec petstore-spec :op "/store/order" :method "post"})
+
+(generate-request {:spec petstore-spec :op "/store/order/{orderId}" :method "delete"})
+(generate-request {:spec petstore-spec :op "/store/order/{orderId}" :method "get"})
+
 
 

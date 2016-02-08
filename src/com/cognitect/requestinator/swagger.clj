@@ -5,7 +5,8 @@
             [clojure.string :as str]
             [clojure.test.check :as c]
             [clojure.test.check.generators :as gen]
-            [com.cognitect.requestinator.json :as json-helper]))
+            [com.cognitect.requestinator.json :as json-helper])
+  (:import [java.util Base64]))
 
 ;; TODO:
 ;; - [ ] Support for `required` being false
@@ -26,15 +27,15 @@
          (apply gen/tuple)
          (gen/fmap (fn [vals] (zipmap (keys props) vals))))))
 
+(defn date-generator
+  [format]
+  (gen/let [d (gen/choose 0 10000000000000)]
+    (.format (java.text.SimpleDateFormat. format)
+             (java.util.Date. d))))
+
 (defn param-value-generator
   [spec param]
-  ;;  (pr "param: ")
-  ;; (prn param)
-  (let [{:strs [$ref type format items in schema enum]} param]
-    ;; (pr "$ref: ")
-    ;; (prn $ref)
-    ;; (pr "spec")
-    ;; (prn spec)
+  (let [{:strs [$ref type format items in schema enum maximum minimum]} param]
     (cond
       $ref
       (param-value-generator spec (json-helper/select spec $ref))
@@ -46,13 +47,30 @@
       (param-value-generator spec schema)
 
       :else
-      (match [type format]
-             ["integer" _] gen/int
-             ["array" _]   (gen/vector (param-value-generator spec items))
-             ["string" _]  gen/string
-             ["object" _]  (object-generator spec param)
-             ["boolean" _] gen/boolean
-             ["file" _]    gen/string
+      (match [type       format    ]
+             ["integer"  "int32"   ] (gen/choose
+                                      (int (or minimum Integer/MIN_VALUE))
+                                      (int (or maximum Integer/MAX_VALUE)))
+             ["integer"  _         ] (gen/choose
+                                      (long (or minimum Long/MIN_VALUE))
+                                      (long (or maximum Long/MAX_VALUE)))
+             ["number"  "float"    ] (gen/double* {:min       (or minimum Float/MIN_VALUE)
+                                                   :max       (or maximum Float/MAX_VALUE)
+                                                   :infinite? false
+                                                   :NaN?      false})
+             ["number"  _          ] (gen/double* {:min       (or minimum Double/MIN_VALUE)
+                                                   :max       (or maximum Double/MAX_VALUE)
+                                                   :infinite? false
+                                                   :NaN?      false})
+             ["string"  "byte"     ] (gen/fmap #(.encodeToString (Base64/getEncoder) %)
+                                               gen/bytes)
+             ["string"  "date"     ] (date-generator "YYYY-MM-dd")
+             ["string"  "date-time"] (date-generator "YYYY-MM-dd'T'HH:mm:SSZ")
+             ["string"  _          ] gen/string
+             ["boolean" _          ] gen/boolean
+             ["array"   _          ] (gen/vector (param-value-generator spec items))
+             ["object"  _          ] (object-generator spec param)
+             ["file"    _          ] gen/string
              :else (throw (ex-info (clojure.core/format "Parameter generation for %s/%s not yet implmented. Parameter definition: %s"
                                                         type
                                                         format
@@ -122,7 +140,7 @@
 (defn format-form-data
   [mime-type form-data]
   (case mime-type
-    "application/x-www-form-encoded"
+    "application/x-www-form-urlencoded"
     (->> form-data
          (map (fn [{:strs [name] :keys [value]}]
                 (str name "=" value)))
@@ -164,7 +182,7 @@
   (let [{:strs [definitions paths]} spec]
     (gen/let [[op op-description]         (gen/elements paths)
               [method method-description] (gen/elements op-description)
-              mime-type                   (gen/elements (get method-description "consumes"))
+              mime-type                   (gen/elements (get method-description "consumes" [nil]))
               params                      (params-generator spec
                                                             (get method-description "parameters"))]
       (request {:op        op
