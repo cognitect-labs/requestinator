@@ -5,7 +5,8 @@
             [clojure.string :as str]
             [clojure.test.check :as c]
             [clojure.test.check.generators :as gen]
-            [com.cognitect.requestinator.json :as json-helper])
+            [com.cognitect.requestinator.json :as json-helper]
+            [com.gfredericks.test.chuck.generators :as chuck-gen])
   (:import [java.util Base64]))
 
 ;; TODO:
@@ -32,6 +33,14 @@
   (gen/let [d (gen/choose 0 10000000000000)]
     (.format (java.text.SimpleDateFormat. format)
              (java.util.Date. d))))
+
+(defn string-generator
+  [{:strs [pattern minLength maxLength]}]
+  (if pattern
+    (chuck-gen/string-from-regex (re-pattern pattern))
+    (if (or minLength maxLength)
+      (gen/vector gen/char (or minLength 0) (or maxLength 30))
+      gen/string)))
 
 (defn param-value-generator
   [spec param]
@@ -66,7 +75,7 @@
                                                gen/bytes)
              ["string"  "date"     ] (date-generator "YYYY-MM-dd")
              ["string"  "date-time"] (date-generator "YYYY-MM-dd'T'HH:mm:SSZ")
-             ["string"  _          ] gen/string
+             ["string"  _          ] (string-generator param)
              ["boolean" _          ] gen/boolean
              ["array"   _          ] (gen/vector (param-value-generator spec items))
              ["object"  _          ] (object-generator spec param)

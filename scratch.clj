@@ -12,12 +12,7 @@
     slurp
     (spit "petstore.swagger.json"))
 
-(def petstore-spec
-  (->> "petstore.swagger.json"
-      slurp
-      json/read-str))
-
-(last (gen/sample (request-generator petstore-spec) 100))
+(last (gen/sample (request-generator amended-spec) 100))
 
 (gen/generate
  (object-generator
@@ -28,27 +23,27 @@
     "quux" {"type" "object"
             "properties" {"baaz" {"type" "integer"}}}}}))
 
-(first (generate petstore-spec))
+(first (generate amended-spec))
 
-(generate-params petstore-spec "/pet/findByStatus" "get")
+(generate-params amended-spec "/pet/findByStatus" "get")
 
-(generate-params petstore-spec "/store/order" "post")
+(generate-params amended-spec "/store/order" "post")
 
-(generate-request {:spec petstore-spec :op "/pet" :method "post"})
-(generate-request {:spec petstore-spec :op "/pet" :method "put"})
+(generate-request {:spec amended-spec :op "/pet" :method "post"})
+(generate-request {:spec amended-spec :op "/pet" :method "put"})
 
-(generate-request {:spec petstore-spec :op "/pet/findByStatus" :method "get"})
+(generate-request {:spec amended-spec :op "/pet/findByStatus" :method "get"})
 
-(generate-request {:spec petstore-spec :op "/pet/findByTags" :method "get"})
+(generate-request {:spec amended-spec :op "/pet/findByTags" :method "get"})
 
-(generate-request {:spec petstore-spec :op "/pet/{petId}" :method "delete"})
+(generate-request {:spec amended-spec :op "/pet/{petId}" :method "delete"})
 
-(generate-request {:spec petstore-spec :op "/pet/{petId}/uploadImage" :method "post"})
+(generate-request {:spec amended-spec :op "/pet/{petId}/uploadImage" :method "post"})
 
-(generate-request {:spec petstore-spec :op "/store/order" :method "post"})
+(generate-request {:spec amended-spec :op "/store/order" :method "post"})
 
-(generate-request {:spec petstore-spec :op "/store/order/{orderId}" :method "delete"})
-(generate-request {:spec petstore-spec :op "/store/order/{orderId}" :method "get"})
+(generate-request {:spec amended-spec :op "/store/order/{orderId}" :method "delete"})
+(generate-request {:spec amended-spec :op "/store/order/{orderId}" :method "get"})
 
 
 

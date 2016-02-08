@@ -1,0 +1,3 @@
+[{"op"    : "add"
+  "path"  : "#/definitions/Pet/properties/photoUrls/items/pattern"
+  "value" : "http://[a-z]{1,10}\\.(com|org|edu)/[a-z]{1,10}"}]
