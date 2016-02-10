@@ -1,13 +1,16 @@
 (ns user
   "Namespace for REPL helper functions."
-  (:require [clojure.data.json :as json]
+  (:require [clojure.core.async :as async :refer [<!! >!!]]
+            [clojure.data.json :as json]
             [clojure.java.io :as io]
             [clojure.repl :refer :all]
             [clojure.test.check.generators :as gen]
             [clojure.tools.namespace.repl :refer [refresh refresh-all]]
-            [com.cognitect.requestinator.swagger :refer :all]
+            [com.cognitect.requestinator.engine :refer :all]
             [com.cognitect.requestinator.json :as json-helper]
-            [com.gfredericks.test.chuck.generators :as chuck-gen]))
+            [com.cognitect.requestinator.swagger :refer :all]
+            [com.gfredericks.test.chuck.generators :as chuck-gen]
+            [simulant.http :as http]))
 
 (def petstore-spec
   (->> "petstore.swagger.json"
@@ -43,6 +46,10 @@
 (defn generate-request
   [{:keys [spec op method mime-type]
     :as opts}]
-  (request (-> {:mime-type "application/x-www-form-urlencoded"}
-               (merge opts)
-               (assoc :params (generate-params spec op method)))))
+  (let [{:strs [host basePath schemes]} spec]
+    (request (-> {:mime-type (gen/generate (gen/elements (get-in spec ["paths" op method "consumes"])))
+                  :host      host
+                  :base-path basePath
+                  :scheme    (gen/generate (gen/elements schemes))}
+                 (merge opts)
+                 (assoc :params (generate-params spec op method))))))

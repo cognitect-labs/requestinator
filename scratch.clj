@@ -14,6 +14,8 @@
 
 (last (gen/sample (request-generator amended-spec) 100))
 
+(take 3 (gen/sample (request-generator amended-spec)))
+
 (gen/generate
  (object-generator
   {}
@@ -45,5 +47,62 @@
 (generate-request {:spec amended-spec :op "/store/order/{orderId}" :method "delete"})
 (generate-request {:spec amended-spec :op "/store/order/{orderId}" :method "get"})
 
+
+
+(let [swagger-url "http://petstore.swagger.io/v2/swagger.json"
+      amendments  (->> "petstore.amendments.json"
+                       io/resource
+                       io/reader
+                       slurp
+                       json/read-str)
+      spec        (-> swagger-url
+                      slurp
+                      json/read-str
+                      (json-helper/amend amendments))
+      client      (http/generate-client (http/cookie-store))
+      request     (first (generate spec))]
+  (client request))
+
+(let [swagger-url "http://petstore.swagger.io/v2/swagger.json"
+      amendments  (->> "petstore.amendments.json"
+                       io/resource
+                       io/reader
+                       slurp
+                       json/read-str)
+      spec        (-> swagger-url
+                      slurp
+                      json/read-str
+                      (json-helper/amend amendments))
+      request     (generate-request {:spec   spec
+                                     :op     "/pet/{petId}/uploadImage"
+                                     :method "post"
+                                     :mime-type "multipart/form-data"})
+      client      (http/generate-client (http/cookie-store))]
+  ;;request
+  (client request)
+  )
+
+
+(let [swagger-url "http://petstore.swagger.io/v2/swagger.json"
+      amendments  (->> "petstore.amendments.json"
+                       io/resource
+                       io/reader
+                       slurp
+                       json/read-str)
+      spec        (-> swagger-url
+                      slurp
+                      json/read-str
+                      (json-helper/amend amendments))
+      now         (java.util.Date.)
+      dir         (io/file "/tmp" (format "%TFT%TT" now now))
+      recorder    (file-recorder dir)]
+  (run {:spec             spec
+          :agent-count      2
+          :interarrival-sec 1
+          :duration-sec     60
+          :recorder         recorder}))
+
+
+(foo)
 
 

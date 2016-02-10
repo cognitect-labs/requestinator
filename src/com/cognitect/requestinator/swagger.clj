@@ -7,7 +7,8 @@
             [clojure.test.check.generators :as gen]
             [com.cognitect.requestinator.json :as json-helper]
             [com.gfredericks.test.chuck.generators :as chuck-gen])
-  (:import [java.util Base64]))
+  (:import [java.util Base64]
+           [java.net URLEncoder]))
 
 ;; TODO:
 ;; - [ ] Support for `required` being false
@@ -105,7 +106,8 @@
   [uri path-params]
   (->> path-params
        (reduce (fn [s {:strs [name] :keys [value]}]
-                 (str/replace s (str "{" name "}") (str value)))
+                 (str/replace s (str "{" name "}") (URLEncoder/encode (str value)
+                                                                      "UTF-8")))
                uri)))
 
 (defn format-array
@@ -134,7 +136,9 @@
        (map (fn [{:strs [name collectionFormat] :keys [value]}]
               (if collectionFormat
                 (format-array collectionFormat name value)
-                (str name "=" value))))
+                (str (URLEncoder/encode name "UTF-8")
+                     "="
+                     (URLEncoder/encode value "UTF-8")))))
        (str/join "&")))
 
 (defn build-headers
@@ -144,7 +148,7 @@
               [(str/lower-case name) (str value)]))
        (into {})))
 
-(def multipart-boundary (str "--------" (java.util.UUID/randomUUID) "--------"))
+(def multipart-boundary (str (java.util.UUID/randomUUID)))
 
 (defn format-form-data
   [mime-type form-data]
@@ -152,49 +156,69 @@
     "application/x-www-form-urlencoded"
     (->> form-data
          (map (fn [{:strs [name] :keys [value]}]
-                (str name "=" value)))
+                (str (URLEncoder/encode name "UTF-8")
+                     "="
+                     (URLEncoder/encode value "UTF-8"))))
          (str/join "&"))
 
     "multipart/form-data"
-    (->> form-data
-         (map (fn [{:strs [name] :keys [value]}]
-                (format "%s\nContent-Disposition: form-data; name=\"%s\"\n%s\n"
-                        multipart-boundary
-                        name
-                        value)))
-         (str/join "\n"))))
+    (str (->> form-data
+              (map (fn [{:strs [name] :keys [value]}]
+                     (format "--%s\nContent-Disposition: form-data; name=\"%s\"\n\n%s\n"
+                             multipart-boundary
+                             name
+                             value)))
+              (str/join "\n"))
+         "--"
+         multipart-boundary
+         "--")))
 
 (defn request
-  [{:keys [op method params mime-type]}]
+  [{:keys [host scheme base-path op method params mime-type]}]
   (let [{:strs [query header path formData body]} (group-by #(get % "in") params)]
-    {:uri            (substitute-path-params op path)
-     :query-string   (build-query-string query)
-     :request-method (keyword method)
-     ::params         params
-     :headers        (merge {"content-type" (if (and formData
-                                                     (= mime-type "multipart/form-data"))
-                                              (str "multipart/form-data; boundary="
-                                                   multipart-boundary)
-                                              mime-type)}
-                            (build-headers header))
-     :body           (cond
-                       body (->> body
-                                 first
-                                 :value
-                                 json/write-str)
-                       formData (format-form-data mime-type formData))}))
+    {:url          (format "%s://%s%s%s"
+                           scheme
+                           host
+                           base-path
+                           (substitute-path-params op path))
+     :query-string (build-query-string query)
+     :method       (keyword method)
+     ::params      params
+     :headers      (merge {"content-type" (cond
+
+                                            (and formData
+                                                 (= mime-type "multipart/form-data"))
+                                            (str "multipart/form-data; boundary="
+                                                 multipart-boundary)
+
+                                            mime-type
+                                            mime-type
+
+                                            :else
+                                            "application/json")}
+                          (build-headers header))
+     :body         (cond
+                     body (->> body
+                               first
+                               :value
+                               json/write-str)
+                     formData (format-form-data mime-type formData))}))
 
 (defn request-generator
   "Given a Swagger spec, return a generator that will create a random
-  Ring request map against one of the operations in it."
+  request map against one of the operations in it."
   [spec]
-  (let [{:strs [definitions paths]} spec]
+  (let [{:strs [host basePath schemes definitions paths]} spec]
     (gen/let [[op op-description]         (gen/elements paths)
               [method method-description] (gen/elements op-description)
               mime-type                   (gen/elements (get method-description "consumes" [nil]))
+              scheme                      (gen/elements schemes)
               params                      (params-generator spec
                                                             (get method-description "parameters"))]
-      (request {:op        op
+      (request {:host      host
+                :scheme    scheme
+                :base-path basePath
+                :op        op
                 :method    method
                 :mime-type mime-type
                 :params    params}))))
