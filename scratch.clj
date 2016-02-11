@@ -96,11 +96,11 @@
       now         (java.util.Date.)
       dir         (io/file "/tmp" (format "%TFT%TT" now now))
       recorder    (file-recorder dir)]
-  (run {:spec             spec
-          :agent-count      2
-          :interarrival-sec 1
-          :duration-sec     60
-          :recorder         recorder}))
+  (generate-activity-streams {:spec             spec
+                              :agent-count      2
+                              :interarrival-sec 1
+                              :duration-sec     60
+                              :recorder         recorder}))
 
 
 (foo)

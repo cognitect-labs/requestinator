@@ -1,39 +1,49 @@
 (ns com.cognitect.requestinator.engine
   "A library to pull together the various pieces of the Requestinator
   into a working system."
-  (:require [com.cognitect.requestinator.swagger :as swagger]
+  (:require [com.cognitect.requestinator.s3 :as s3]
+            [com.cognitect.requestinator.swagger :as swagger]
             [com.cognitect.requestinator.json :as json-helper]
             [com.cognitect.requestinator.thread-pool :as thread-pool]
+            [cognitect.transit :as transit]
             [com.stuartsierra.component :as component]
             [clojure.core.async :as async :refer [>!! <!!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [simulant.http :as http]))
+            [simulant.http :as http])
+  (:import [java.io ByteArrayInputStream ByteArrayOutputStream FileOutputStream InputStream]
+           [java.nio.file CopyOption Files]))
 
 (defn file-recorder
   "Returns a new recorder function that records to files in a directory."
   [dir]
-  (io/make-parents (io/file dir "probe.txt"))
   (let [counter (atom 0)]
-    (fn [val]
+    (fn [relative-path ^bytes data]
       (log/debug "Recording a value" :counter @counter)
-      (->> val
-           pr-str
-           (spit (io/file dir (format "%s-%010d.edn"
-                                      (:agent val)
-                                      (swap! counter inc))))))))
+      (let [path (io/file dir relative-path)]
+        (io/make-parents path)
+        (with-open [stream (FileOutputStream. path)]
+          (.write stream data))))))
 
 (defn s3-recorder
   "Returns a new recorder task that records to files in an S3 bucket"
-  [bucket prefix signal]
-  (throw (ex-info "Not yet implemented"
-                  {:reason :not-yet-implemented})))
+  [creds bucket prefix]
+  (let [client (s3/client creds)
+        counter (atom 0)]
+    (fn [val]
+     (s3/upload client
+                bucket
+                (format "%s/%s/%10d.edn"
+                        prefix
+                        (:agent val)
+                        (swap! counter inc))
+                (pr-str val)))))
 
 (defn erlang
   [mean]
   (- (* (Math/log (rand)) mean)))
 
-(defn create-agent-task
+(defn create-agent
   [{:keys [interarrival-sec duration-sec]} ch requests id]
   (fn []
     (try
@@ -59,7 +69,7 @@
     :as opts}]
   (let [channels        (repeatedly agent-count #(async/chan 1))
         request-streams (repeatedly agent-count #(swagger/generate spec))
-        tasks           (map #(create-agent-task opts %1 %2 (format "%04d" %3)) channels request-streams (range))
+        tasks           (map #(create-agent opts %1 %2 (format "%04d" %3)) channels request-streams (range))
         threads         (map #(Thread. %) tasks)]
     (doseq [thread threads]
       (.start thread))
@@ -86,11 +96,29 @@
     (catch Throwable t
       (log/error t "Error while consuming results"))))
 
-(defn run
+(defn- encode
+  "Serializes `val` to a byte array."
+  [val]
+  (let [out    (ByteArrayOutputStream.)
+        writer (transit/writer out :json)]
+    (transit/write writer val)
+    (.toByteArray out)))
+
+(defn generate-activity-streams
+  "Generates requests to a web service described by `spec` and records
+  them using `recorder`."
   [{:keys [spec agent-count interarrival-sec duration-sec recorder]
     :as opts}]
-  (let [{:keys [channels threads]} (start-agents opts)]
-    (consume-results channels recorder)
-    {:channels channels
-     :threads threads}))
+  (for [agent-id (range agent-count)]
+    (let [requests (swagger/generate spec)]
+      (loop [[request & more]      requests
+             t                     (erlang interarrival-sec)]
+        (when (< t duration-sec)
+          (recorder (format "%04d/%010d.transit"
+                            agent-id
+                            (long (* t 1000)))
+                    (encode request))
+          (recur more (+ t (erlang interarrival-sec))))))))
+
+
 

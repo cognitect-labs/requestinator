@@ -10,6 +10,9 @@
                   :exclusions [org.slf4j/slf4j-nop]]
                  [com.gfredericks/test.chuck "0.2.5"]
                  [com.stuartsierra/component "0.3.1"]
+                 [com.cognitect/transit-clj "0.8.285"]
+
+                 ;; Logging - oy
 
                  ;; Use Logback as the main logging implementation:
                  [ch.qos.logback/logback-classic "1.1.2"]
