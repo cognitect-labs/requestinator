@@ -97,12 +97,56 @@
       dir         (io/file "/tmp" (format "%TFT%TT" now now))
       recorder    (file-recorder dir)]
   (generate-activity-streams {:spec             spec
-                              :agent-count      2
+                              :agent-count      1
                               :interarrival-sec 1
-                              :duration-sec     60
-                              :recorder         recorder}))
+                              :duration-sec     10
+                              :recorder         recorder})
+  dir)
 
 
 (foo)
 
 
+(let [in (java.io.FileInputStream. "/tmp/2016-02-11T16:05:24/index.transit")
+      reader (transit/reader in :json)]
+  (transit/read reader))
+
+(execute {:fetch-f (file-fetcher "/tmp/2016-02-16T15:15:00")
+          :record-f (fn [path bytes] (log/debug :path path :bytes (alength bytes)))
+          :start (java.util.Date.)
+          :recorder-concurrency 1})
+
+(execute {:fetch-f (file-fetcher "/tmp/2016-02-16T15:15:00")
+          :record-f (file-recorder "/tmp/2016-02-16T15:15:00/responses")
+          :start (java.util.Date. (+ (System/currentTimeMillis) 20000))
+          :recorder-concurrency 1})
+
+
+
+
+
+(let [swagger-url "http://petstore.swagger.io/v2/swagger.json"
+      amendments  (->> "petstore.amendments.json"
+                       io/resource
+                       io/reader
+                       slurp
+                       json/read-str)
+      spec        (-> swagger-url
+                      slurp
+                      json/read-str
+                      (json-helper/amend amendments))
+      now         (java.util.Date.)
+      dir         (io/file "/tmp" (format "%TFT%TT" now now))
+      recorder    (file-recorder dir)]
+  (generate-activity-streams {:spec             spec
+                              :agent-count      10
+                              :interarrival-sec 1
+                              :duration-sec     60
+                              :recorder         recorder})
+  dir)
+
+(let [dir "/tmp/2016-02-16T15:43:39"]
+ (execute {:fetch-f (file-fetcher dir)
+           :record-f (file-recorder (io/file dir "responses"))
+           :start (java.util.Date.)
+           :recorder-concurrency 5}))
