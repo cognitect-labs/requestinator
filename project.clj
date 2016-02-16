@@ -11,26 +11,6 @@
                  [com.gfredericks/test.chuck "0.2.5"]
                  [com.stuartsierra/component "0.3.1"]
                  [com.cognitect/transit-clj "0.8.285"]
-
-                 ;; Logging - oy
-
-                 ;; Use Logback as the main logging implementation:
-                 [ch.qos.logback/logback-classic "1.1.2"]
-
-                 ;; Logback implements the SLF4J API:
-                 [org.slf4j/slf4j-api "1.7.7"]
-
-                 ;; Redirect Apache Commons Logging to Logback via the SLF4J API:
-                 [org.slf4j/jcl-over-slf4j "1.7.7"]
-
-                 ;; Redirect Log4j 1.x to Logback via the SLF4J API:
-                 [org.slf4j/log4j-over-slf4j "1.7.7"]
-
-                 ;; Redirect Log4J 2.x to Logback via the SLF4J API:
-                 [org.apache.logging.log4j/log4j-to-slf4j "2.0.2"]
-
-                 ;; Redirect java.util.logging to Logback via the SLF4J API.
-                 ;; Requires installing the bridge handler, see README:
-                 [org.slf4j/jul-to-slf4j "1.7.7"]]
+                 [com.stuartsierra/log.dev "0.1.0"]]
   :profiles {:dev {:dependencies [[org.clojure/tools.namespace "0.2.11"]]
                    :source-paths ["dev"]}})

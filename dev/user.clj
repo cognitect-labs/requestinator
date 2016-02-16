@@ -5,6 +5,7 @@
             [clojure.java.io :as io]
             [clojure.repl :refer :all]
             [clojure.test.check.generators :as gen]
+            [clojure.tools.logging :as log]
             [clojure.tools.namespace.repl :refer [refresh refresh-all]]
             [com.cognitect.requestinator.engine :refer :all]
             [com.cognitect.requestinator.json :as json-helper]
