@@ -48,7 +48,7 @@ lein run execute --source file:///tmp/requestinator-test --destination file:///t
 ### Run Via Docker Against S3
 
 ```
-docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator execute --source file:///tmp/requestinator-test --destination file:///tmp/requestinator-test/results --recorder-concurrency 3
+docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator execute --source s3://com.cognitect.requestinator.test/readme-example --destination s3://com.cognitect.requestinator.test/readme-example/results --recorder-concurrency 3
 ```
 
 ## License
