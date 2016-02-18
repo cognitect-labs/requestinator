@@ -3,9 +3,9 @@
 A Clojure library designed to generate and execute requests against a
 web service based on a [Swagger](http://swagger.io) specification.
 
-## Usage
+## Generating Requests
 
-### Via Leinginen
+### Run Via Leinginen
 
 Generate three indepdendent, random sequences of requests based on the
 [Petstore Sample Service](http://petstore.swagger.io/), and save it to
@@ -17,14 +17,26 @@ data will be generated.
 lein run generate --spec-uri http://petstore.swagger.io/v2/swagger.json --destination file:///tmp/requestinator-test --agent-count 3 --interarrival-sec 0.5 --duration-sec 60
 ```
 
-### Via Docker
+### Build a Docker Image
+
+Docker image names are based on the git revision. The following
+sequence of commands will build a docker image named
+`requestinator:v1.2.3`. It will also tag it `latest`.
 
 ```
 git commit -am "Message for commit"
 git tag v1.2.3
 bin/build
+```
+
+### Run Via Docker
 
 ```
+docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator generate --spec-uri http://petstore.swagger.io/v2/swagger.json --destination s3://com.cognitect.requestinator.test/readme-example --agent-count 3 --interarrival-sec 0.5 --duration-sec 60
+```
+
+This example assumes you have `AWS_ACCESS_KEY` and `AWS_SECRET_KEY` environment variables set to provide access to the `com.cognitect.requestinator.test` bucket.
+
 
 ## License
 

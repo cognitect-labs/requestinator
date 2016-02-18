@@ -75,7 +75,7 @@
           [bucket & paths] (str/split without-proto #"/")]
       (engine/s3-recorder (s3/client)
                           bucket
-                          (str/join paths "/")))
+                          (str/join "/" paths)))
 
     :else
     (throw (ex-info (str "Unsupported destination: " uri)
