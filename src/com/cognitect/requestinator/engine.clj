@@ -19,16 +19,14 @@
 (defn file-recorder
   "Returns a new recorder function that records to files in a directory."
   [dir]
-  (let [counter (atom 0)]
-    (fn [relative-path ^bytes data]
-      (log/debug "Recording a value"
-                 :counter @counter
-                 :relative-path relative-path
-                 :bytes (alength data))
-      (let [path (io/file dir relative-path)]
-        (io/make-parents path)
-        (with-open [stream (FileOutputStream. path)]
-          (.write stream data))))))
+  (fn [relative-path ^bytes data]
+    (log/debug "Recording a value"
+               :relative-path relative-path
+               :bytes (alength data))
+    (let [path (io/file dir relative-path)]
+      (io/make-parents path)
+      (with-open [stream (FileOutputStream. path)]
+        (.write stream data)))))
 
 (defn file-fetcher
   [dir]
@@ -39,17 +37,19 @@
 
 (defn s3-recorder
   "Returns a new recorder task that records to files in an S3 bucket"
-  [creds bucket prefix]
-  (let [client (s3/client creds)
-        counter (atom 0)]
-    (fn [val]
-     (s3/upload client
-                bucket
-                (format "%s/%s/%10d.edn"
-                        prefix
-                        (:agent val)
-                        (swap! counter inc))
-                (pr-str val)))))
+  [client bucket prefix]
+  (fn [relative-path ^bytes data]
+    (s3/upload client
+               bucket
+               (s3/combine-paths prefix relative-path)
+               data)))
+
+(defn s3-fetcher
+  [client bucket prefix]
+  (fn [relative-path]
+    (s3/get-object client
+                   bucket
+                   (s3/combine-paths prefix relative-path))))
 
 (defn erlang
   [mean]

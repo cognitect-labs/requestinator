@@ -122,7 +122,7 @@
           :recorder-concurrency 1})
 
 
-
+;;; File test
 
 
 (let [swagger-url "http://petstore.swagger.io/v2/swagger.json"
@@ -150,3 +150,57 @@
            :record-f (file-recorder (io/file dir "responses"))
            :start (java.util.Date.)
            :recorder-concurrency 5}))
+
+
+;;; S3 Test
+
+(let [swagger-url "http://petstore.swagger.io/v2/swagger.json"
+      amendments  (->> "petstore.amendments.json"
+                       io/resource
+                       io/reader
+                       slurp
+                       json/read-str)
+      spec        (-> swagger-url
+                      slurp
+                      json/read-str
+                      (json-helper/amend amendments))
+      now         (java.util.Date.)
+      recorder    (s3-recorder (s3/client)
+                               "com.cognitect.requestinator.test"
+                               (format "test/%TFT%TT" now now))]
+  (generate-activity-streams {:spec             spec
+                              :agent-count      10
+                              :interarrival-sec 1
+                              :duration-sec     60
+                              :recorder         recorder}))
+
+(let [bucket "com.cognitect.requestinator.test"
+      prefix "test/2016-02-16T16:28:39"
+      now    (java.util.Date.)
+      folder (format "responses/%TFT%TT" now now)]
+  (execute {:fetch-f (s3-fetcher (s3/client) bucket prefix)
+            :record-f (s3-recorder (s3/client) bucket (s3/combine-paths prefix
+                                                                        folder))
+            :start (java.util.Date.)
+            :recorder-concurrency 5}))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(refresh)
+(let [now (java.util.Date.)
+      now-dir  (str "file:///tmp/" (format "%TFT%TT" now now))]
+ (main/main* "generate"
+             "-s" "http://petstore.swagger.io/v2/swagger.json"
+             "-a" "file:resources/petstore.amendments.json"
+             "-d" now-dir
+             "-n" 3
+             "-i" 1.5
+             "-t" 21.2))
+
+(let [now (java.util.Date.)
+      now-dir  (str "file:///tmp/" (format "%TFT%TT" now now))]
+  (main/main* "generate"
+              "--spec-uri" "http://petstore.swagger.io/v2/swagger.json"
+              "--destination" now-dir
+              "--agent-count" "3"
+              "--interarrival-sec" "0.5"
+              "--duration-sec" "60"))

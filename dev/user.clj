@@ -9,6 +9,8 @@
             [clojure.tools.namespace.repl :refer [refresh refresh-all]]
             [com.cognitect.requestinator.engine :refer :all]
             [com.cognitect.requestinator.json :as json-helper]
+            [com.cognitect.requestinator.main :as main]
+            [com.cognitect.requestinator.s3 :as s3]
             [com.cognitect.requestinator.swagger :refer :all]
             [com.gfredericks.test.chuck.generators :as chuck-gen]
             [simulant.http :as http]))

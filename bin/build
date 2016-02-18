@@ -1,0 +1,80 @@
+#!/bin/bash
+
+# Die immediately if any command fails
+set -e
+
+PROJECT_NAME=requestinator # TODO: find a way to parse this
+PROJECT_VERSION=$(head -1 project.clj | grep -oE '\d+\.\d+(\.\d+)?(-SNAPSHOT)?')
+GIT_VERSION=$(git describe --tags)
+GIT_SHA=$(git rev-parse HEAD)
+
+while [[ "$1" != "" ]]; do
+    case "$1" in
+        "--allow-dirty")
+            echo "Allowing uncommitted changes in the build."
+            ALLOW_DIRTY=yes
+            GIT_SHA="${GIT_SHA}-dirty"
+            GIT_VERSION="${GIT_VERSION}-dirty"
+            ;;
+        "--verbose" | "-v")
+            set -x
+            ;;
+    esac
+    shift
+done
+
+if [[ ("$ALLOW_DIRTY" != "yes") && (-n "$(git status --porcelain)") ]]; then
+  echo "Project directory has uncommitted changes. Refusing to build."
+  exit 1
+fi
+
+echo "Building"
+
+cd $(dirname $0)/..
+
+echo "Project version detected as ${PROJECT_VERSION}. Git version is ${GIT_VERSION}. Git SHA is ${GIT_SHA}"
+
+lein clean
+
+# Simulant is a snapshot version, so we have to override or Leinginen
+# will complain because it doesn't normally let releases have snapshot
+# dependencies.
+LEIN_SNAPSHOTS_IN_RELEASE=yes lein uberjar
+
+UBERJAR_NAME=${PROJECT_NAME}-${PROJECT_VERSION}-standalone.jar
+UBERJAR_PATH=target/${UBERJAR_NAME}
+DEPLOY_DIR=deploy
+
+PROJECT_DIR=$(PWD)/
+echo "Project directory is ${PROJECT_DIR}"
+
+cp ${UBERJAR_PATH} ${DEPLOY_DIR}
+
+cd ${DEPLOY_DIR}
+
+cat <<EOF > Dockerfile
+FROM ubuntu:14.04
+
+RUN apt-get update
+RUN apt-get install software-properties-common -y
+RUN add-apt-repository ppa:webupd8team/java -y
+RUN apt-get update
+RUN echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections
+RUN apt-get install oracle-java8-installer -y
+RUN apt-get install oracle-java8-set-default
+
+ADD ${UBERJAR_NAME} .
+
+ENTRYPOINT ["java", "-cp", "${UBERJAR_NAME}", "clojure.main", "-m", "com.cognitect.requestinator.main"]
+
+EOF
+
+docker build -t ${PROJECT_NAME}:${GIT_VERSION} .
+docker tag ${PROJECT_NAME}:${GIT_VERSION} ${PROJECT_NAME}:latest
+
+# The build leaves artifacts in the target directory, which can screw
+# with code reloading.
+cd ${PROJECT_DIR}
+lein clean
+
+echo "Build successful. Artifacts written to ${DEPLOY_DIR}."
