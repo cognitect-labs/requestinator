@@ -3,21 +3,7 @@
 A Clojure library designed to generate and execute requests against a
 web service based on a [Swagger](http://swagger.io) specification.
 
-## Generating Requests
-
-### Run Via Leinginen
-
-Generate three indepdendent, random sequences of requests based on the
-[Petstore Sample Service](http://petstore.swagger.io/), and save it to
-`/tmp/YYYY-MM-DD-HH-mm-ss`. Requests will be scheduled on average
-twice a second for each of the three agents, and 60 seconds worth of
-data will be generated.
-
-```
-lein run generate --spec-uri http://petstore.swagger.io/v2/swagger.json --destination file:///tmp/requestinator-test --agent-count 3 --interarrival-sec 0.5 --duration-sec 60
-```
-
-### Build a Docker Image
+## Build a Docker Image
 
 Docker image names are based on the git revision. The following
 sequence of commands will build a docker image named
@@ -29,7 +15,21 @@ git tag v1.2.3
 bin/build
 ```
 
-### Run Via Docker
+## Generating Requests
+
+### Run Via Leinginen Against the Local Filesystem
+
+Generate three indepdendent, random sequences of requests based on the
+[Petstore Sample Service](http://petstore.swagger.io/), and save it to
+`/tmp/YYYY-MM-DD-HH-mm-ss`. Requests will be scheduled on average
+twice a second for each of the three agents, and 60 seconds worth of
+data will be generated.
+
+```
+lein run generate --spec-uri http://petstore.swagger.io/v2/swagger.json --destination file:///tmp/requestinator-test --agent-count 3 --interarrival-sec 0.5 --duration-sec 60
+```
+
+### Run Via Docker Against S3
 
 ```
 docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator generate --spec-uri http://petstore.swagger.io/v2/swagger.json --destination s3://com.cognitect.requestinator.test/readme-example --agent-count 3 --interarrival-sec 0.5 --duration-sec 60
@@ -37,6 +37,19 @@ docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator generate --spec-
 
 This example assumes you have `AWS_ACCESS_KEY` and `AWS_SECRET_KEY` environment variables set to provide access to the `com.cognitect.requestinator.test` bucket.
 
+## Executing Requests
+
+### Run Via Leingen Against the Local Filesystem
+
+```
+lein run execute --source file:///tmp/requestinator-test --destination file:///tmp/requestinator-test/results --recorder-concurrency 3
+```
+
+### Run Via Docker Against S3
+
+```
+docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator execute --source file:///tmp/requestinator-test --destination file:///tmp/requestinator-test/results --recorder-concurrency 3
+```
 
 ## License
 

@@ -20,7 +20,7 @@
   "Returns a new recorder function that records to files in a directory."
   [dir]
   (fn [relative-path ^bytes data]
-    (log/debug "Recording a value"
+    (log/debug "Recording a value to filesystem"
                :relative-path relative-path
                :bytes (alength data))
     (let [path (io/file dir relative-path)]
@@ -39,6 +39,11 @@
   "Returns a new recorder task that records to files in an S3 bucket"
   [client bucket prefix]
   (fn [relative-path ^bytes data]
+    (log/debug "Recording a value to S3"
+               :relative-path relative-path
+               :bucket bucket
+               :prefix prefix
+               :bytes (alength data))
     (s3/upload client
                bucket
                (s3/combine-paths prefix relative-path)
@@ -188,13 +193,16 @@
 (defn create-recorder
   "Returns a running recorder that will monitor channels `chans`,
   taking available maps and passing them to `record-f` a function of
-  two arguments: a relative path and a byte array of data."
-  [chans record-f]
+  two arguments: a relative path and a byte array of data.
+
+  Closes the channel `status` when `chans` have all closed."
+  [chans record-f status]
   (let [worker (Thread.
                 (fn []
                   (try
                     (loop [chans (set chans)]
-                      (when-not (empty? chans)
+                      (if (empty? chans)
+                        (async/close! status)
                         (let [[val port] (async/alts!! (seq chans))]
                           (if (nil? val)
                             (do
@@ -230,18 +238,9 @@
                          :fetcher     (create-fetcher  request-infos ->throttler fetch-f)
                          :throttler   (create-throttler start ->throttler ->agent)
                          :agent       (create-agent ->agent ->recorder)}))
-        ->recorders  (map :->recorder processes)]
+        ->recorders  (map :->recorder processes)
+        status       (async/chan)]
     {:processes (into [] processes)
-     :recorder  (repeatedly recorder-concurrency
-                            #(create-recorder ->recorders record-f))}))
-
-(defn execute-filesystem
-  [dir start recorder-concurrency]
-  (execute {:fetch-f              (file-fetcher dir)
-            :record-f             (file-recorder dir)
-            :start                start
-            :recorder-concurrency recorder-concurrency}))
-
-(defn execute-s3
-  [bucket prefix start recorder-concurrency]
-  (throw (ex-info "Not yet implemented")))
+     :recorder  (into [] (repeatedly recorder-concurrency
+                                     #(create-recorder ->recorders record-f status)))
+     :status     status}))

@@ -204,3 +204,37 @@
               "--agent-count" "3"
               "--interarrival-sec" "0.5"
               "--duration-sec" "60"))
+
+(let [now (java.util.Date.)
+      now-dir  (str "file:///tmp/" (format "%TFT%TT" now now))]
+  (main/main* "generate"
+              "--spec-uri" "http://petstore.swagger.io/v2/swagger.json"
+              "--destination" now-dir
+              "--agent-count" "3"
+              "--interarrival-sec" "0.5"
+              "--duration-sec" "60")
+  (main/main* "execute"
+              "--source" now-dir
+              "--destination" (str now-dir "/responses")
+              "--recorder-concurrency" "5"))
+
+(let [dir "/tmp/2016-02-18T15:33:16/"
+      {:keys [status]} (execute {:fetch-f (file-fetcher dir)
+                                 :record-f (file-recorder (io/file dir "responses2"))
+                                 :start (java.util.Date.)
+                                 :recorder-concurrency 5})]
+  (loop []
+    (when-let [msg (<!! status)]
+      (println msg)
+      (recur))))
+
+
+(let [dir "/tmp/2016-02-18T15:33:16/"]
+  (execute {:fetch-f (file-fetcher dir)
+                :record-f (file-recorder (io/file dir "responses2"))
+                :start (java.util.Date.)
+                :recorder-concurrency 5}))
+
+
+
+

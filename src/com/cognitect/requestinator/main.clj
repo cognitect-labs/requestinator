@@ -1,7 +1,8 @@
 (ns com.cognitect.requestinator.main
   "An interface for external (command-line) invocation of
   requestinator functionality."
-  (:require [clojure.data.json :as json]
+  (:require [clojure.core.async :refer [<!!] :as async]
+            [clojure.data.json :as json]
             [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.tools.logging :as log]
@@ -61,26 +62,42 @@
                             json/read-str)]
     (json-helper/amend spec amendments)))
 
-(defn create-recorder
+(defn parse-uri
   [uri]
   (cond
     (.startsWith uri "file:///")
-    (engine/file-recorder (subs uri (count "file://")))
+    {:type :file
+     :dir (subs uri (count "file://"))}
 
     (.startsWith uri "file:")
-    (engine/file-recorder (subs uri (count "file:")))
+    {:type :file
+     :dir (subs uri (count "file:"))}
 
     (.startsWith uri "s3://")
     (let [without-proto (subs uri (count "s3://"))
           [bucket & paths] (str/split without-proto #"/")]
-      (engine/s3-recorder (s3/client)
-                          bucket
-                          (str/join "/" paths)))
+      {:type   :s3
+       :bucket bucket
+       :prefix (str/join "/" paths)})
 
     :else
     (throw (ex-info (str "Unsupported destination: " uri)
                     {:reason ::unsupported-destination
                      :uri    uri}))))
+
+(defn create-recorder
+  [uri]
+  (let [{:keys [type dir bucket prefix]} (parse-uri uri)]
+    (case type
+      :file (engine/file-recorder dir)
+      :s3 (engine/s3-recorder (s3/client) bucket prefix))))
+
+(defn create-fetcher
+  [uri]
+  (let [{:keys [type dir bucket prefix]} (parse-uri uri)]
+    (case type
+      :file (engine/file-fetcher dir)
+      :s3 (engine/s3-fetcher (s3/client) bucket prefix))))
 
 (defn generate
   [{:keys [spec-uri amendments-uri destination agent-count interarrival-sec duration-sec]
@@ -98,8 +115,25 @@
    :message "Success"})
 
 (defn execute
-  [options arguments]
-  (println "TODO: Execute" :options options :arguments arguments))
+  [{:keys [source destination start recorder-concurrency] :as options} arguments]
+  (log/debug "Execute" :options)
+  (let [fetcher  (create-fetcher source)
+        recorder (create-recorder destination)
+        {:keys [status]} (engine/execute {:fetch-f              fetcher
+                                          :record-f             recorder
+                                          ;; There is support in the API for delaying the
+                                          ;; start, but I haven't figured out how best to
+                                          ;; pass it in via the CLI, so for the moment we
+                                          ;; just go with "10 seconds from now"
+                                          :start                (java.util.Date. (+ (System/currentTimeMillis)
+                                                                                    10000))
+                                          :recorder-concurrency recorder-concurrency})]
+    (loop []
+      (when-let [msg (<!! status)]
+        (println msg)
+        (recur)))
+    {:code    0
+     :message "Success"}))
 
 (def commands
   {"generate" {:cli-spec [["-s" "--spec-uri SWAGGERURI" "Path to Swagger JSON spec"
@@ -124,7 +158,15 @@
                            :parse-fn #(Double. %)
                            :validate [number? "Must a number."]]]
               :impl generate}
-   "execute" {}})
+   "execute" {:cli-spec [["-s" "--source REQUEST_SOURCE" "Path to location of requests"
+                          :id :source]
+                         ["-d" "--destination DESTINATION" "Path to destination for results"
+                          :id :destination]
+                         ["-n" "--recorder-concurrency RECORDER_CONCURRENCY" "Number of threads to use to record results"
+                          :id :recorder-concurrency
+                          :parse-fn #(Long. %)
+                          :validate [integer? "Must be an integer"]]]
+              :impl execute}})
 
 ;; REPL helper so we don't actually exit the process
 (defn main*
