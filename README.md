@@ -51,6 +51,22 @@ lein run execute --source file:///tmp/requestinator-test --destination file:///t
 docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator execute --source s3://com.cognitect.requestinator.test/readme-example --destination s3://com.cognitect.requestinator.test/readme-example/results --recorder-concurrency 3
 ```
 
+## Architecture
+
+### Execution
+
+![Diagram](doc/execution.png)
+
+## TODO
+
+- Implement the rest of Swagger. Pretty good coverage at the moment,
+  but definitely some of the spec is not implemented. Partial list:
+  - [ ] Support for `required` being false
+  - [ ] Support for XML
+  - [ ] Overriding consumes
+- Implement the rest of [JSON Pointer](http://tools.ietf.org/html/rfc6901).
+- Improve tests
+
 ## License
 
 Copyright © 2016 Cognitect, Inc.

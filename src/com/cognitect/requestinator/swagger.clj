@@ -10,14 +10,6 @@
   (:import [java.util Base64]
            [java.net URLEncoder]))
 
-;; TODO:
-;; - [ ] Support for `required` being false
-;; - [ ] Support for MIME types
-;; - [ ] Support for XML
-;; - [ ] Support for file datatype
-;; - [ ] References for parameters
-;; - [ ] Overriding consumes
-
 (declare param-value-generator)
 
 (defn object-generator
