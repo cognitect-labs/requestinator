@@ -129,8 +129,7 @@
                     (doseq [{:keys [path] :as request-info} request-infos]
                       (log/debug "Fetching" :path path)
                       (async/>!! output-chan (assoc request-info
-                                                    :request
-                                                    (decode (fetch-f path)))))
+                                                    :request (decode (fetch-f path)))))
                     (catch Throwable t
                       (log/error t "Error in fetcher"))
                     (finally
@@ -200,19 +199,22 @@
   (let [worker (Thread.
                 (fn []
                   (try
-                    (loop [chans (set chans)]
+                    (loop [chans (set chans)
+                           index []]
                       (if (empty? chans)
-                        (async/close! status)
+                        (do
+                          (record-f "index.transit" (encode index))
+                          (async/close! status))
                         (let [[val port] (async/alts!! (seq chans))]
                           (if (nil? val)
                             (do
                               (log/debug "Removing a completed channel."
                                          :remaining (dec (count chans)))
-                              (recur (disj chans port)))
+                              (recur (disj chans port) index))
                             (do
                               (log/debug "Recording a response" :path (:path val))
-                              (record-f (:path val) (encode (:response val)))
-                              (recur chans))))))
+                              (record-f (:path val) (encode val))
+                              (recur chans (conj index (:path val))))))))
                     (catch Throwable t
                       (log/error t "Error in recorder.")))))]
     (.start worker)
