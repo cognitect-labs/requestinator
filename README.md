@@ -21,7 +21,7 @@ bin/build
 
 Generate three indepdendent, random sequences of requests based on the
 [Petstore Sample Service](http://petstore.swagger.io/), and save it to
-`/tmp/YYYY-MM-DD-HH-mm-ss`. Requests will be scheduled on average
+`/tmp/requestinator-test`. Requests will be scheduled on average
 twice a second for each of the three agents, and 60 seconds worth of
 data will be generated.
 
