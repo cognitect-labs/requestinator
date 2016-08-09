@@ -8,7 +8,8 @@
             [clojure.tools.logging :as log]
             [com.cognitect.requestinator.engine :as engine]
             [com.cognitect.requestinator.json :as json-helper]
-            [com.cognitect.requestinator.s3 :as s3]))
+            [com.cognitect.requestinator.s3 :as s3]
+            [com.cognitect.requestinator.serialization :as ser]))
 
 (comment
  (def cli-options
@@ -89,15 +90,15 @@
   [uri]
   (let [{:keys [type dir bucket prefix]} (parse-uri uri)]
     (case type
-      :file (engine/file-recorder dir)
-      :s3 (engine/s3-recorder (s3/client) bucket prefix))))
+      :file (ser/file-recorder dir)
+      :s3 (ser/s3-recorder (s3/client) bucket prefix))))
 
 (defn create-fetcher
   [uri]
   (let [{:keys [type dir bucket prefix]} (parse-uri uri)]
     (case type
-      :file (engine/file-fetcher dir)
-      :s3 (engine/s3-fetcher (s3/client) bucket prefix))))
+      :file (ser/file-fetcher dir)
+      :s3 (ser/s3-fetcher (s3/client) bucket prefix))))
 
 (defn generate
   [{:keys [spec-uri amendments-uri destination agent-count interarrival-sec duration-sec]

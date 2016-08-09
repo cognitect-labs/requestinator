@@ -51,6 +51,14 @@ lein run execute --source file:///tmp/requestinator-test --destination file:///t
 docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator execute --source s3://com.cognitect.requestinator.test/readme-example --destination s3://com.cognitect.requestinator.test/readme-example/results --recorder-concurrency 3
 ```
 
+## Generating Reports
+
+### Run Via Leingen Against the Local Filesystem
+
+```
+TODO
+```
+
 ## Architecture
 
 ### Execution

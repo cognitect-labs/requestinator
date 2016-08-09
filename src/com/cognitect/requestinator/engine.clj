@@ -1,14 +1,13 @@
 (ns com.cognitect.requestinator.engine
   "A library to pull together the various pieces of the Requestinator
   into a working system."
-  (:require [com.cognitect.requestinator.s3 :as s3]
-            [com.cognitect.requestinator.swagger :as swagger]
+  (:require [com.cognitect.requestinator.swagger :as swagger]
             [com.cognitect.requestinator.json :as json-helper]
+            [com.cognitect.requestinator.report :as report]
+            [com.cognitect.requestinator.serialization :as ser]
             [com.cognitect.requestinator.thread-pool :as thread-pool]
-            [cognitect.transit :as transit]
             [com.stuartsierra.component :as component]
             [clojure.core.async :as async :refer [>!! <!!]]
-            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [simulant.http :as http])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream FileOutputStream InputStream]
@@ -16,63 +15,9 @@
 
 ;;; Helper functionaltiy
 
-(defn file-recorder
-  "Returns a new recorder function that records to files in a directory."
-  [dir]
-  (fn [relative-path ^bytes data]
-    (log/debug "Recording a value to filesystem"
-               :relative-path relative-path
-               :bytes (alength data))
-    (let [path (io/file dir relative-path)]
-      (io/make-parents path)
-      (with-open [stream (FileOutputStream. path)]
-        (.write stream data)))))
-
-(defn file-fetcher
-  [dir]
-  (fn [path]
-    (-> (io/file dir path)
-        .toPath
-        Files/readAllBytes)))
-
-(defn s3-recorder
-  "Returns a new recorder task that records to files in an S3 bucket"
-  [client bucket prefix]
-  (fn [relative-path ^bytes data]
-    (log/debug "Recording a value to S3"
-               :relative-path relative-path
-               :bucket bucket
-               :prefix prefix
-               :bytes (alength data))
-    (s3/upload client
-               bucket
-               (s3/combine-paths prefix relative-path)
-               data)))
-
-(defn s3-fetcher
-  [client bucket prefix]
-  (fn [relative-path]
-    (s3/get-object client
-                   bucket
-                   (s3/combine-paths prefix relative-path))))
-
 (defn erlang
   [mean]
   (- (* (Math/log (rand)) mean)))
-
-(defn encode
-  "Serializes `val` to a byte array."
-  [val]
-  (let [out    (ByteArrayOutputStream.)
-        writer (transit/writer out :json)]
-    (transit/write writer val)
-    (.toByteArray out)))
-
-(defn decode
-  "Deserializes `val` from a byte array."
-  [^bytes in]
-  (let [reader (transit/reader (ByteArrayInputStream. in) :json)]
-    (transit/read reader)))
 
 ;;; Generation
 
@@ -93,14 +38,14 @@
                                   agent-id
                                   (long (* t 1000)))]
                  (recorder path
-                           (encode request))
+                           (ser/encode request))
                  (recur more
                         (+ t (erlang interarrival-sec))
                         (assoc-in agent-info
                                   [:requests t]
                                   path)))))))
        (into (sorted-map))
-       encode
+       ser/encode
        (recorder "index.transit")))
 
 ;; Execution
@@ -129,7 +74,7 @@
                     (doseq [{:keys [path] :as request-info} request-infos]
                       (log/debug "Fetching" :path path)
                       (async/>!! output-chan (assoc request-info
-                                                    :request (decode (fetch-f path)))))
+                                                    :request (ser/decode (fetch-f path)))))
                     (catch Throwable t
                       (log/error t "Error in fetcher"))
                     (finally
@@ -175,10 +120,14 @@
                     (loop []
                       (when-let [{:keys [request] :as request-info} (<!! input-chan)]
                         (log/debug "Agent requesting" :path (:path request-info))
-                        (>!! output-chan
-                             (assoc request-info
-                                    :response
-                                    (client request)))
+                        (let [start (System/currentTimeMillis)
+                              result (client request)
+                              stop (System/currentTimeMillis)
+                              duration (/ (- stop start) 1000.0)]
+                          (>!! output-chan
+                               (assoc request-info
+                                      :response result
+                                      :duration duration)))
                         (recur)))
                     (catch Throwable t
                       (log/error t "Error in agent"))
@@ -203,7 +152,7 @@
                            index []]
                       (if (empty? chans)
                         (do
-                          (record-f "index.transit" (encode index))
+                          (record-f "index.transit" (ser/encode index))
                           (async/close! status))
                         (let [[val port] (async/alts!! (seq chans))]
                           (if (nil? val)
@@ -213,8 +162,16 @@
                               (recur (disj chans port) index))
                             (do
                               (log/debug "Recording a response" :path (:path val))
-                              (record-f (:path val) (encode val))
-                              (recur chans (conj index (:path val))))))))
+                              (record-f (:path val) (ser/encode val))
+                              (recur chans
+                                     (conj index
+                                           (-> val
+                                               (select-keys [:t
+                                                             :path
+                                                             :agent-id
+                                                             :duration])
+                                               (assoc :status
+                                                      (get-in val [:response :status]))))))))))
                     (catch Throwable t
                       (log/error t "Error in recorder.")))))]
     (.start worker)
@@ -222,7 +179,7 @@
 
 (defn execute
   [{:keys [fetch-f record-f start recorder-concurrency]}]
-  (let [index       (decode (fetch-f "index.transit"))
+  (let [index       (ser/decode (fetch-f "index.transit"))
         agent-count (count index)
         processes   (for [[agent-id agent-info] index]
                       (let [request-infos (sort-by :t
@@ -246,3 +203,9 @@
      :recorder  (into [] (repeatedly recorder-concurrency
                                      #(create-recorder ->recorders record-f status)))
      :status     status}))
+
+;;; Reporting
+
+(defn report
+  [{:keys [fetch-f record-f] :as opts}]
+  (report/report opts))

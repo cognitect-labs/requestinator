@@ -1,0 +1,36 @@
+#timeline {
+    width: 100%;
+    height: 60px;
+}
+
+#detail {
+    border: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.details {
+    font-family: monospace;
+    font-size: 120%;
+}
+
+.request,.response {
+    border: solid 1px black;
+    margin-bottom: 7px;
+}
+
+.headers {
+    margin-bottom: 12px;
+}
+
+.header .colon {
+    margin-right: 5px;
+}
+
+.header-name {
+    font-weight: bold;
+}
+
+.method,.url,.version {
+    padding-right: 10px
+}
