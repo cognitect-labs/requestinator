@@ -120,7 +120,9 @@
   [record-f]
   (write-js record-f "js" {} #_{:optimizations :whitespace})
   ;;(emit-images shared-dir)
-  (doseq [resource ["css/style.css"]]
+  (doseq [resource ["css/style.css"
+                    "ext/js/json-formatter/bundle.js"
+                    "ext/js/json-formatter/bundle.js.map"]]
     (->> resource
          (str "assets/")
          io/resource
@@ -217,7 +219,7 @@
                    :type "text/css"}]
            [:script {:src "../../js/report.js"
                      :type "text/javascript"}]
-           [:script {:src "http://azimi.me/json-formatter-js/dist/bundle.js"
+           [:script {:src "../../ext/js/json-formatter/bundle.js"
                      :type "text/javascript"}]]
           [:body
            [:div.details
