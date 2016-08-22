@@ -1,6 +1,6 @@
 (do
   (refresh)
-  (let [dir "/tmp/requestinator/results/2016-08-08T15:21:16"
+  (let [dir "/tmp/requestinator/petstore-full/results/2016-08-17T14:59:23"
         now (java.util.Date.)
         dest (str dir
                   "/reports/"
@@ -13,6 +13,7 @@
                                 "test.txt")]
   (.write rw "Hi there"))
 
+(+ 1 2)
 
 (let [dir "/tmp/requestinator/results/2016-08-08T15:21:16"
       fetch-f (ser/file-fetcher dir)]
@@ -26,3 +27,23 @@
        :response
        :body
        pprint))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Why is generation using up all my memory?
+;;
+
+;; Answer: because test.check was generating with a max-length of 100,
+;; which is too big for complicated specs.
+
+(as-> "http://localhost:8888/v1/petstore-full.json" ?
+  (slurp ?)
+  (json/read-str ?)
+  (generate ? 30)
+  (drop 100 ?)
+  ;;(take 100 ?)
+  ;;(dorun ?)
+  (first ?)
+  (pprint ?)
+  ;;(time ?)
+  )

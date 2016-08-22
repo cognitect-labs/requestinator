@@ -16,6 +16,11 @@
           agent-id
           (long (* t 1000))))
 
+(def t-scale
+  "Determines how much the SVG will be scaled horizontally, soas to
+  look about right."
+  15)
+
 (defn write-index
   "Writes the report's index.html via record-f."
   [index record-f]
@@ -44,29 +49,44 @@
                             (reduce max))]
          [:svg {:id "timeline"
                 :viewBox (format "0 0 %f %d"
-                                 max-t
+                                 (double (* t-scale max-t))
                                  (inc max-agent))
+                ;; TODO: This is sort of an arbitrary heuristic. Can we fix it?
+                :height (format "%dpx" (* (inc max-agent) 10))
                 :preserveAspectRatio "none"}
-          (for [[agent-id items] data
-                {:keys [t status path duration] :as item} items]
-            (let [color (if (= 200 status) "green" "red")]
-              [:g
-               {:class "timeline-cell"
-                :data-detail-uri (str "../../" (detail-uri item))}
-               [:rect
-                {:fill color
-                 :x t
-                 :y (+ agent-id 0.1)
-                 :width duration
-                 :height 0.8}]
-               [:path {:fill "white"
-                       :stroke color
-                       :stroke-width 0.01
-                       :d (format "M%f %f L%f %f L%f %f z"
-                                  (+ t duration) (+ agent-id 0.1)
-                                  (+ t duration 0.1) (+ agent-id 0.5)
-                                  (+ t duration) (+ agent-id 0.9))}]]))])
-       [:iframe#detail]
+          [:g#timeline-content
+           {:transform (format "scale(%f, 1)" (double t-scale))}
+           ;; Row highlights
+           (for [[agent-id items] (sort-by first data)]
+             [[:rect {:class (str "timeline-outline "
+                                  (if (odd? agent-id) "odd" "even"))
+                      :x 0
+                      :y agent-id
+                      :width max-t
+                      :height 0.99}]])
+           ;; Highlighting of selected item
+           [:line#highlight-x {:x1 0 :y1 0 :x2 max-t :y2 0}]
+           [:line#highlight-y {:x1 0 :y1 0 :x2 0 :y2 (inc max-agent)}]
+           ;; The actual data points
+           (for [[agent-id items] (sort-by first data)
+                 {:keys [t status path duration] :as item} items]
+             (let [status-class (format "status%dxx" (-> status (/ 100) long))]
+               [:g
+                {:class "timeline-cell"
+                 :data-detail-uri (str "../../" (detail-uri item))}
+                [:rect
+                 {:class (str "timeline-rect " status-class)
+                  :x t
+                  :y (+ agent-id 0.1)
+                  :width duration
+                  :height 0.8}]
+                [:path {:class (str "timeline-handle " status-class)
+                        :d (format "M%f %f L%f %f L%f %f z"
+                                   (+ t duration) (+ agent-id 0.1)
+                                   (+ t duration 0.1) (+ agent-id 0.5)
+                                   (+ t duration) (+ agent-id 0.9))}]]))]])
+       [:div#detail-container
+        [:iframe#detail]]
        [:script {:type "text/javascript"}
         "com.cognitect.requestinator.report.start();"]]])))
 

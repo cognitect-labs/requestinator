@@ -218,5 +218,11 @@
 (defn generate
   "Given a Swagger spec, return a lazy sequence of Ring request maps
   representing valid requests described by it."
-  [spec]
-  (gen/sample-seq (request-generator spec)))
+  ;; Using a sufficiently large max-size on a complex spec uses O(MG)
+  ;; memory - and the default in test.check is 100. For the small
+  ;; number of Swagger specs I tried, 30 seems to do a decent job of
+  ;; generating "interesting" requests often enough. But we probably
+  ;; need to expose `max-size` from the command line eventually.
+  ([spec] (generate spec 30))
+  ([spec max-size]
+   (gen/sample-seq (request-generator spec) max-size)))

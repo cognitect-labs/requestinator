@@ -1,6 +1,6 @@
 (defproject requestinator "0.1.0-SNAPSHOT"
-  :dependencies [[org.clojure/clojure "1.9.0-alpha10"]
-                 [org.clojure/clojurescript "1.9.89"]
+  :dependencies [[org.clojure/clojure "1.9.0-alpha11"]
+                 [org.clojure/clojurescript "1.9.198"]
                  ;;[org.clojure/clojurescript "1.8.51"]
                  [org.clojure/core.async "0.2.374"]
                  [com.amazonaws/aws-java-sdk "1.10.52"]
@@ -20,4 +20,6 @@
   :main ^:skip-aot com.cognitect.requestinator.main
   :repl-options {:init-ns user}
   :profiles {:dev {:dependencies [[org.clojure/tools.namespace "0.2.11"]]
-                   :source-paths ["dev"]}})
+                   :source-paths ["dev"]
+                   :jvm-opts ["-Xloggc:/tmp/gc.log"]}
+             :profile {:jvm-opts ["-agentpath:/Users/candera/bin/libyjpagent.jnilib"]}})

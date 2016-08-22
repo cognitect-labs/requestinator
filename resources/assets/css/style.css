@@ -1,12 +1,17 @@
 #timeline {
-    width: 100%;
-    height: 60px;
+    border: solid #ddd 1px;
 }
 
 #detail {
     border: 0;
     width: 100%;
     height: 100%;
+}
+
+#detail-container {
+    position: fixed;
+    left: 0;
+    width: 100%;
 }
 
 .details {
@@ -33,4 +38,63 @@
 
 .method,.url,.version {
     padding-right: 10px
+}
+
+.timeline-cell {
+    stroke-width: 0.01;
+    fill: white;
+}
+
+.timeline-rect {
+    fill: red;
+}
+
+.timeline-handle {
+    stroke: red;
+    fill: #8ff;
+}
+
+.timeline-handle {
+    stroke: red;
+    fill: #fcc;
+}
+
+.timeline-handle.status2xx {
+    stroke: green;
+    fill: #dfd;
+}
+
+.timeline-rect.status2xx {
+    fill: green;
+}
+
+.timeline-outline {
+    stroke-width: 0.01;
+    fill: white;
+    stroke: none;
+}
+
+.timeline-outline.odd {
+    fill: #eee;
+}
+
+.timeline-cell.selected {
+    stroke-width: 0.03;
+}
+
+#highlight-x,#highlight-y {
+    stroke-width: 0.75;
+    stroke: yellow;
+}
+
+#highlight-y {
+    stroke-width: 0.05;
+}
+
+#highlight-x.locked {
+    stroke: orange;
+}
+
+#highlight-y.locked {
+    stroke: orange;
 }

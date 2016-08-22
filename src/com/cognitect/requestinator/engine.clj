@@ -28,22 +28,21 @@
   [{:keys [spec agent-count interarrival-sec duration-sec recorder]
     :as opts}]
   (->> (for [agent-id (range agent-count)]
-         (let [requests (swagger/generate spec)]
-           (loop [[request & more]      requests
-                  t                     (erlang interarrival-sec)
-                  agent-info            {}]
-             (if (< duration-sec t)
-               [agent-id agent-info]
-               (let [path (format "%04d/%010d.transit"
-                                  agent-id
-                                  (long (* t 1000)))]
-                 (recorder path
-                           (ser/encode request))
-                 (recur more
-                        (+ t (erlang interarrival-sec))
-                        (assoc-in agent-info
-                                  [:requests t]
-                                  path)))))))
+         (loop [[request & more]      (swagger/generate spec)
+                t                     (erlang interarrival-sec)
+                agent-info            {}]
+           (if (< duration-sec t)
+             [agent-id agent-info]
+             (let [path (format "%04d/%010d.transit"
+                                agent-id
+                                (long (* t 1000)))]
+               (recorder path
+                         (ser/encode request))
+               (recur more
+                      (+ t (erlang interarrival-sec))
+                      (assoc-in agent-info
+                                [:requests t]
+                                path))))))
        (into (sorted-map))
        ser/encode
        (recorder "index.transit")))

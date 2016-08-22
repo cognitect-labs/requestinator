@@ -3,4 +3,5 @@
 
 ((clojure-mode
   (inf-clojure-buffer . "requestinator-repl")
+  (use-inf-clojure-program . "lein repl")
   (use-inf-clojure . t)))
