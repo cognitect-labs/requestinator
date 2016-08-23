@@ -2,10 +2,13 @@
   (:require [goog.dom :as gdom]
             [goog.dom.classlist :as gclasses]
             [goog.events :as gevents]
+            [goog.events.MouseWheelHandler]
             [goog.History :as history]
             [goog.string :as gstring]
             [goog.string.format]
             [goog.style :as gstyle]))
+
+(def svg-ns "http://www.w3.org/2000/svg")
 
 (def history (goog.History.))
 
@@ -213,7 +216,71 @@
                    .render)]
       (gdom/replaceNode json e))))
 
+(def t-scroll-factor 1.001)
+(def t-scale-default 15)
+(def t-scroll (atom 0))
+
+(defn set-timeline-view
+  [t-scale]
+  (let [timeline (gdom/getElement "timeline")
+        timeline-content (gdom/getElement "timeline-content")
+        max-agent (-> timeline (.getAttribute "max-agent") js/Number.)
+        max-t (-> timeline (.getAttribute "max-t") js/Number.)]
+    (.setAttributeNS
+     timeline-content
+     nil
+     "transform"
+     (gstring/format "scale(%f 1)" t-scale))
+    (doseq [[n v] [["t-scale" t-scale]
+                   ["t-scroll" @t-scroll]
+                   ["max-t" max-t]
+                   ["max-agent" max-agent]
+                   ["viewBox" (gstring/format "0 0 %f %d"
+                                              (double (* t-scale max-t))
+                                              (inc max-agent))]]]
+      (.setAttributeNS timeline nil n v))))
+
+(defn mousewheel
+  [e]
+  (log "mousewheel"
+         :offsetX (.-offsetX e)
+         :offsetY (.-offsetY e)
+         :clientX (.-clientX e)
+         :clientY (.-clientY e)
+         :screenX (.-screenX e)
+         :screenY (.-screenY e)
+         :deltaX (.-deltaX e)
+         :deltaY (.-deltaY e)
+         :keys (js/Object.keys e))
+  ;; Only zoom for vertical scroll
+  (when (< (Math/abs (.-deltaX e)) (Math/abs (.-deltaY e)))
+    (let [timeline (gdom/getElement "timeline")
+          old-bounds (-> timeline .getBoundingClientRect)
+          old-left (.-left old-bounds)
+          old-width (.-width old-bounds)
+          client-x (.-clientX e)
+          old-origin (/ (- client-x old-left)
+                        old-width)
+          old-body-scroll (-> js/document .-body .-scrollLeft)
+          new-scroll (swap! t-scroll + (.-deltaY e))
+          new-scale (* t-scale-default (Math/pow t-scroll-factor new-scroll))
+          _ (set-timeline-view new-scale)
+          new-bounds (-> timeline .getBoundingClientRect)
+          new-width (.-width new-bounds)
+          width-delta (- new-width old-width)
+          body-scroll-delta (* width-delta old-origin)
+          new-body-scroll (+ body-scroll-delta old-body-scroll)]
+
+      (-> js/document .-body .-scrollLeft (set! new-body-scroll))
+      (.preventDefault e)
+      (.stopPropagation e))))
+
 (defn ^:export start
   []
   (unhighlight nil)
+  (set-timeline-view t-scale-default)
+  (gevents/listen (gevents/MouseWheelHandler. (gdom/getElement "timeline"))
+                  gevents/MouseWheelHandler.EventType.MOUSEWHEEL
+                  mousewheel)
   (add-tracking "timeline-cell"))
+
