@@ -50,29 +50,21 @@
 
 (defn highlight
   [source]
-  (log "highlight"
-       :source source
-       :name (.-name source)
-       :id (.-id source))
-  #_(add-class source "selected")
   (let [bbox (.getBBox source)]
     (.setAttribute @highlight-x
                    "transform"
-                   (gstring/format "translate(0 %f)" (+ (.-y bbox) 0.5)))
+                   (gstring/format "translate(0 %f)" (.-y bbox)))
     (.setAttribute @highlight-y
                    "transform"
-                   (gstring/format "translate(%f 0)" (+ (.-x bbox)
-                                                        (/ (.-width bbox) 2))))
+                   (gstring/format "translate(%f 0)" (.-x bbox)))
+    (.setAttribute @highlight-y
+                   "width"
+                   (.-width bbox))
     (gstyle/showElement @highlight-x true)
     (gstyle/showElement @highlight-y true)))
 
 (defn unhighlight
   [source]
-  (log "unhighlight"
-       :source source
-       :name (.-name source)
-       :id (.-id source))
-  #_(remove-class source "selected")
   (gstyle/showElement @highlight-x false)
   (gstyle/showElement @highlight-y false))
 
@@ -96,14 +88,21 @@
 
 (defn show
   [target]
-  (gstyle/showElement target true)
-  #_(set-display-style target "block"))
+  (gstyle/showElement target true))
 
 (defn hide
   [target]
   (log "hide")
-  (gstyle/showElement target false)
-  #_(set-display-style target "none"))
+  (gstyle/showElement target false))
+
+(defn lock-highlight
+  "Changes the color of the highlight to match the lock state."
+  [lock?]
+  (doseq [h [@highlight-x @highlight-y]]
+    (if lock?
+      (add-class h "locked")
+      (remove-class h "locked"))))
+
 
 (defn tracker
   []
@@ -155,8 +154,7 @@
                              (show-detail target)
                              (highlight source)
                              (.setToken history (str "result/" target))
-                             (doseq [h [@highlight-x @highlight-y]]
-                               (add-class h "locked"))
+                             (lock-highlight true)
                              (swap! tracker assoc
                                     :locked? true
                                     :current-target target
@@ -165,16 +163,14 @@
                         (unhighlight source)
                         (show-detail target)
                         (.setToken history "")
-                        (doseq [h [@highlight-x @highlight-y]]
-                          (remove-class h "locked"))
+                        (lock-highlight false)
                         (swap! tracker assoc :locked? false))
       [:unlocked :different] (do
                                (when current-target (hide-detail current-target))
                                (when current-source (unhighlight current-source))
                                (highlight source)
                                (show-detail target)
-                               (doseq [h [@highlight-x @highlight-y]]
-                                 (add-class h "locked"))
+                               (lock-highlight true)
                                (.setToken history (str "result/" target))
                                (swap! tracker assoc
                                       :locked? true
@@ -183,8 +179,7 @@
       [:unlocked :same] (do
                           (highlight source)
                           (.setToken history (str "result/" target))
-                          (doseq [h [@highlight-x @highlight-y]]
-                            (add-class h "locked"))
+                          (lock-highlight true)
                           (swap! tracker assoc
                                  :locked? true
                                  :current-target target
@@ -220,4 +215,5 @@
 
 (defn ^:export start
   []
+  (unhighlight nil)
   (add-tracking "timeline-cell"))

@@ -65,8 +65,8 @@
                       :width max-t
                       :height 0.99}]])
            ;; Highlighting of selected item
-           [:line#highlight-x {:x1 0 :y1 0 :x2 max-t :y2 0}]
-           [:line#highlight-y {:x1 0 :y1 0 :x2 0 :y2 (inc max-agent)}]
+           [:rect#highlight-x {:x 0 :y 0 :width max-t :height 1}]
+           [:rect#highlight-y {:x 0 :y 0 :width 0 :height max-agent}]
            ;; The actual data points
            (for [[agent-id items] (sort-by first data)
                  {:keys [t status path duration] :as item} items]
@@ -89,7 +89,6 @@
         [:iframe#detail]]
        [:script {:type "text/javascript"}
         "com.cognitect.requestinator.report.start();"]]])))
-
 
 (defn make-temp-dir
   "Make a temporary directory and return its path"

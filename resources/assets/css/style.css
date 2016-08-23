@@ -83,18 +83,12 @@
 }
 
 #highlight-x,#highlight-y {
-    stroke-width: 0.75;
-    stroke: yellow;
+    fill: #bbddff;
+    opacity: 0.2;
 }
 
-#highlight-y {
-    stroke-width: 0.05;
-}
-
-#highlight-x.locked {
-    stroke: orange;
-}
-
+#highlight-x.locked,
 #highlight-y.locked {
-    stroke: orange;
+    opacity: 0.7;
+    fill: yellow;
 }
