@@ -92,3 +92,34 @@
     opacity: 0.7;
     fill: yellow;
 }
+
+.time {
+    stroke: black;
+    stroke-dasharray: 0.2 0.5;
+    opacity: 0.4;
+    stroke-width: 0.01;
+}
+
+.time5 {
+    opacity: 0.6;
+    stroke-dasharray: 0.2 0.5;
+}
+
+.time15 {
+    opacity: 0.8;
+    stroke-dasharray: 0.75 0.25;
+}
+
+.time30 {
+    opacity: 1;
+    stroke-dasharray: 0.9 0.1;
+}
+
+.time60 {
+    opacity: 1;
+    stroke-width: 0.02;
+    stroke-dasharray: 1 0;
+}
+
+.time-label {
+}

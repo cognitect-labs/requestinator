@@ -18,6 +18,9 @@
                           (interpose " ")
                           (apply str))))
 
+#_(defn log
+  [& messages])
+
 (defn get-by-id
   [id]
   (.getElementById js/document id))
@@ -219,6 +222,7 @@
 (def t-scroll-factor 1.001)
 (def t-scale-default 15)
 (def t-scroll (atom 0))
+(def t-scroll-max 1000)
 
 (defn set-timeline-view
   [t-scale]
@@ -242,7 +246,7 @@
 
 (defn mousewheel
   [e]
-  (log "mousewheel"
+  #_(log "mousewheel"
          :offsetX (.-offsetX e)
          :offsetY (.-offsetY e)
          :clientX (.-clientX e)
@@ -262,7 +266,12 @@
           old-origin (/ (- client-x old-left)
                         old-width)
           old-body-scroll (-> js/document .-body .-scrollLeft)
-          new-scroll (swap! t-scroll + (.-deltaY e))
+          new-scroll (swap! t-scroll (fn [s]
+                                       (let [d (.-deltaY e)
+                                             n (+ d s)]
+                                         (if (< t-scroll-max n)
+                                           s
+                                           n))))
           new-scale (* t-scale-default (Math/pow t-scroll-factor new-scroll))
           _ (set-timeline-view new-scale)
           new-bounds (-> timeline .getBoundingClientRect)
@@ -270,7 +279,7 @@
           width-delta (- new-width old-width)
           body-scroll-delta (* width-delta old-origin)
           new-body-scroll (+ body-scroll-delta old-body-scroll)]
-
+      (log "mousewheel" :scroll new-scroll)
       (-> js/document .-body .-scrollLeft (set! new-body-scroll))
       (.preventDefault e)
       (.stopPropagation e))))

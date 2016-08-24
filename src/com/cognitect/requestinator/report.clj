@@ -62,6 +62,30 @@
                        :y agent-id
                        :width max-t
                        :height 0.99}]])
+            (for [x (range 0 max-t)]
+              [[:line
+                {:class (str "time time"
+                             (->> [60 30 15 5 1]
+                                  (filter #(zero? (mod x %)))
+                                  first))
+                 :x1 x
+                 :x2 x
+                 :y1 0
+                 :y2 max-agent}]])
+            [:g.time-labels
+             (let [x-scale 150
+                   y-scale 10]
+               (for [x (range 0 max-t)]
+                 [:text.time-label
+                  {:transform (format "translate(%d, %d) scale(%f, %f) translate(0, %d)"
+                                      x
+                                      max-agent
+                                      (/ 1.0 x-scale)
+                                      (/ 1.0 y-scale)
+                                      y-scale)
+                   :x 0.2
+                   :y 0}
+                  (format "%d:%02d" (long (/ x 60)) (mod x 60))]))]
             ;; Highlighting of selected item
             [:rect#highlight-x {:x 0 :y 0 :width max-t :height 1}]
             [:rect#highlight-y {:x 0 :y 0 :width 0 :height max-agent}]
