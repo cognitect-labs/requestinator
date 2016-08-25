@@ -1,12 +1,18 @@
 (ns com.cognitect.requestinator.report
-  (:require [goog.dom :as gdom]
+  (:require [cljs.core.async :as async
+             :refer [<! >! timeout]]
+            [goog.dom :as gdom]
             [goog.dom.classlist :as gclasses]
             [goog.events :as gevents]
             [goog.events.MouseWheelHandler]
+            [goog.fx.dom :as fx]
+            [goog.fx.dom.Fade]
             [goog.History :as history]
             [goog.string :as gstring]
             [goog.string.format]
-            [goog.style :as gstyle]))
+            [goog.style :as gstyle])
+  (:require-macros
+   [cljs.core.async.macros :refer [go go-loop]]))
 
 (def svg-ns "http://www.w3.org/2000/svg")
 
@@ -293,3 +299,51 @@
                   mousewheel)
   (add-tracking "timeline-cell"))
 
+(defn show-lightbox
+  [id _]
+  (-> id
+      gdom/getElement
+      (gstyle/setPosition 0 0)))
+
+(defn hide-lightbox
+  [e evt]
+  (if (= e (.-target evt))
+    (gstyle/setPosition e -10000 0)
+    false))
+
+(defn copy-contents
+  "Copies the contents of the element to the clipboard"
+  [id tip]
+  (log "copy-contents" :id id)
+  (let [r (.createRange js/document)
+        t (gdom/getElement tip)]
+    (.selectNodeContents r (gdom/getElement id))
+    (-> js/window .getSelection .removeAllRanges)
+    (-> js/window .getSelection (.addRange r))
+    (.execCommand js/document "copy")
+    (-> js/window .getSelection .removeAllRanges)
+    (.play (fx/FadeInAndShow. t 250))
+    (go
+      (<! (timeout 5000))
+      (.play (fx/FadeOutAndHide. t 500)))))
+
+(defn ^:export start-detail
+  []
+  (doseq [e (array-seq (gdom/getElementsByClass "lightbox-trigger"))]
+    (let [id (.getAttribute e "data-lightbox-id")]
+      (gevents/listen e
+                      gevents/EventType.CLICK
+                      (fn [evt]
+                        (show-lightbox id evt)))))
+  (doseq [e (array-seq (gdom/getElementsByClass "lightbox"))]
+    (gevents/listen e
+                    gevents/EventType.CLICK
+                    (fn [evt]
+                      (hide-lightbox e evt))))
+  (doseq [e (array-seq (gdom/getElementsByClass "copy-trigger"))]
+    (let [id (.getAttribute e "data-copy-target")
+          tip (.getAttribute e "data-copy-tip")]
+      (gevents/listen e
+                      gevents/EventType.CLICK
+                      (fn [evt]
+                        (copy-contents id tip))))))

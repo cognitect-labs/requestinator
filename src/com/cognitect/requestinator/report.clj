@@ -163,7 +163,9 @@
   ;;(emit-images shared-dir)
   (doseq [resource ["css/style.css"
                     "ext/js/json-formatter/bundle.js"
-                    "ext/js/json-formatter/bundle.js.map"]]
+                    "ext/js/json-formatter/bundle.js.map"
+                    "images/curl.svg"
+                    "images/clipboard.svg"]]
     (->> resource
          (str "assets/")
          io/resource
@@ -180,7 +182,10 @@
                 (str (.getPath uri)
                      (when-let [q (.getQuery uri)]
                        (str "?" q))))]
-   [:span.version "HTTP/1.1"]])
+   [:span.version "HTTP/1.1"]
+   [:button.curl-button.lightbox-trigger
+    {:data-lightbox-id "curl-lightbox"
+     :title "Display curl command for this request"}]])
 
 (defn response-line
   "Returns HTML data for rendering the first line of a request."
@@ -239,6 +244,38 @@
        (json-content? r) (json-body body)
        :else [:pre body]))])
 
+(defn curl-command
+  "Returns an invocation of 'curl' that will replicate 'request'."
+  [request]
+  (let [cmd (->> [ ;; Base command
+                  "curl --include"
+                  ;; Method
+                  (when-let [method (some-> request :method name .toUpperCase)]
+                    (str "--request " method))
+                  ;; Headers
+                  (->> request
+                       :headers
+                       (remove (comp #{"Content-Length" "Host" "Connection"} key))
+                       (mapv (fn [[name values]]
+                               (format "--header \"%s: %s\""
+                                       name
+                                       (->> values (interpose ",") (apply str))))))
+                  (when (:body request)
+                    "--data @-")
+                  ;; URL
+                  (:url request)]
+                 (remove nil?)
+                 (mapv (fn [item]
+                         (if (string? item)
+                           [item]
+                           item)))
+                 (reduce into [])
+                 (interpose " \\\n  ")
+                 (apply str))]
+    (if-let [body (:body request)]
+      (str cmd " <<EOF\n" body "\nEOF")
+      cmd)))
+
 (defn write-details
   "Write the individual detail reports for each of the requests."
   [index fetch-f record-f]
@@ -280,8 +317,18 @@
                (response-line response)
                (headers response)
                (body response)])]
+           [:div#curl-lightbox.lightbox
+            [:div#curl-command.lightbox-content
+             [:div.button-bar
+              [:a#curl-copy-trigger.copy-trigger
+               {:title "Copy command to clipboard"
+                :data-copy-target "curl-command-text"
+                :data-copy-tip "curl-copy-tip"}]
+              [:span#curl-copy-tip.copy-tip "Command was copied to the clipboard"]]
+             [:pre#curl-command-text (curl-command request)]]]
            [:script {:type "application/javascript"}
-            "com.cognitect.requestinator.report.render_json('json-body');"]]])))))
+            "com.cognitect.requestinator.report.start_detail();
+com.cognitect.requestinator.report.render_json('json-body');"]]])))))
 
 (defn report
   [{:keys [fetch-f record-f]}]

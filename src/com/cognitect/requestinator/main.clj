@@ -8,6 +8,7 @@
             [clojure.tools.logging :as log]
             [com.cognitect.requestinator.engine :as engine]
             [com.cognitect.requestinator.json :as json-helper]
+            [com.cognitect.requestinator.report :as report]
             [com.cognitect.requestinator.s3 :as s3]
             [com.cognitect.requestinator.serialization :as ser]))
 
@@ -136,6 +137,16 @@
     {:code    0
      :message "Success"}))
 
+(defn report
+  [{:keys [source destination] :as options} arguments]
+  (println "Building report" :source source :destination destination)
+  (let [fetcher (create-fetcher source)
+        recorder (create-recorder destination)]
+    (report/report {:fetch-f fetcher
+                    :record-f recorder}))
+  {:code 0
+   :message "Success"})
+
 (def commands
   {"generate" {:cli-spec [["-s" "--spec-uri SWAGGERURI" "Path to Swagger JSON spec"
                            :id :spec-uri
@@ -167,7 +178,12 @@
                           :id :recorder-concurrency
                           :parse-fn #(Long. %)
                           :validate [integer? "Must be an integer"]]]
-              :impl execute}})
+              :impl execute}
+   "report" {:cli-spec [["-s" "--source RESULTS_SOURCE" "Path to the directory containing the results index."
+                         :id :source]
+                        ["-d" "--destination DESTINATION" "Path where report files will be writen."
+                         :id :destination]]
+             :impl report}})
 
 ;; REPL helper so we don't actually exit the process
 (defn main*

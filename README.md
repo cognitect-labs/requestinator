@@ -56,8 +56,10 @@ docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator execute --source
 ### Run Via Leingen Against the Local Filesystem
 
 ```
-TODO
+lein run report --source file:///tmp/requestinator-test/results --destination file:///tmp/requestinator-test/reports
 ```
+
+Open `/tmp/requestinator-test/reports/main/html/index.html` to view.
 
 ## Architecture
 

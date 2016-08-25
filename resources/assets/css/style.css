@@ -123,3 +123,59 @@
 
 .time-label {
 }
+
+.lightbox {
+    position: fixed;
+    top: 0;
+    left: -10000;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, .4);
+}
+
+.lightbox-content {
+    margin: 50 auto;
+    background: white;
+    width: 70%;
+    font-size: 120%;
+    padding: 10px;
+}
+
+.curl-button {
+    background-image: url("../images/curl.svg");
+    background-size: 20px 20px;
+    width: 24px;
+    height: 24px;
+    display: inline-block;
+    vertical-align: middle;
+    background-color: white;
+}
+
+.copy-trigger {
+    background-image: url("../images/clipboard.svg");
+    background-size: 22px 22px;
+    background-position-x: 2px;
+    background-repeat: no-repeat;    
+    width: 24px;
+    height: 24px;
+    display: inline-block;
+    background-color: white;
+    border-style: outset;
+}
+
+.copy-trigger:active {
+    border-style: inset;
+}
+
+.copy-tip {
+    position: relative;
+    opacity: 0;
+    font-size: 75%;
+    margin-left: 10px;
+    background: aliceblue;
+    border: 1px dashed grey;
+    border-radius: 3px;
+    vertical-align: middle;
+    padding: 3px;
+    top: -10;
+}

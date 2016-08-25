@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="200" height="200">
+  <defs>
+    <style type="text/css"><![CDATA[
+      rect {
+        fill: none;
+        stroke: black;
+        stroke-width: 12;
+        stroke-linejoin: round;
+      }
+      ]]></style>
+    <rect id="small-end" width="20" height="100" />
+    <rect id="large-end" width="20" height="150" />
+    <g id="end">
+      <use xlink:href="#small-end" x="0" y="25" />
+      <use xlink:href="#large-end" x="20" y="0" />
+    </g>
+  </defs>
+  <use xlink:href="#end" x="20" y="10"/>
+  <use xlink:href="#end" x="-180" y="10" transform="scale(-1 1)"/>
+  <rect id="bar" width="80" height="20" x="60" y="75" />
+</svg>
