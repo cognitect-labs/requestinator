@@ -1,3 +1,14 @@
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+#timeline-container {
+    display: inline-block;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+}
+
 #timeline {
     border: solid #ddd 1px;
 }
@@ -9,8 +20,6 @@
 }
 
 #detail-container {
-    position: fixed;
-    left: 0;
     width: 100%;
 }
 
@@ -139,6 +148,7 @@
     width: 70%;
     font-size: 120%;
     padding: 10px;
+    overflow: scroll;
 }
 
 .curl-button {
@@ -179,3 +189,4 @@
     padding: 3px;
     top: -10;
 }
+

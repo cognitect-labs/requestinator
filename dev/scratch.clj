@@ -1,6 +1,6 @@
 (do
   (refresh)
-  (let [dir "/tmp/requestinator/petstore-full/results/2016-08-24T14:53:42"
+  (let [dir "/tmp/requestinator/petstore-full/results/2016-08-29T10:37:06"
         now (java.util.Date.)
         dest (str dir
                   "/reports/"

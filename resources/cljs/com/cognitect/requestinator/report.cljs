@@ -261,9 +261,12 @@
          :screenY (.-screenY e)
          :deltaX (.-deltaX e)
          :deltaY (.-deltaY e)
-         :keys (js/Object.keys e))
-  ;; Only zoom for vertical scroll
-  (when (< (Math/abs (.-deltaX e)) (Math/abs (.-deltaY e)))
+         :keys (js/Object.keys e)
+         :shift (.-shiftKey e))
+  ;; Only zoom for vertical scroll when shift is held
+  ;; TODO: Figure out how to make this reasonable on a touchscreen
+  (when (and (.-shiftKey e)
+             (< (Math/abs (.-deltaX e)) (Math/abs (.-deltaY e))))
     (let [timeline (gdom/getElement "timeline")
           old-bounds (-> timeline .getBoundingClientRect)
           old-left (.-left old-bounds)
