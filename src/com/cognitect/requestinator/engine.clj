@@ -1,45 +1,48 @@
 (ns com.cognitect.requestinator.engine
   "A library to pull together the various pieces of the Requestinator
   into a working system."
-  (:require [com.cognitect.requestinator.swagger :as swagger]
-            [com.cognitect.requestinator.json :as json-helper]
+  (:require [com.cognitect.requestinator.json :as json-helper]
+            [com.cognitect.requestinator.generators :as gen]
             [com.cognitect.requestinator.report :as report]
             [com.cognitect.requestinator.serialization :as ser]
             [com.cognitect.requestinator.thread-pool :as thread-pool]
             [com.stuartsierra.component :as component]
+            [requestinator :as r]
+            [requestinator.agent :as agent]
             [clojure.core.async :as async :refer [>!! <!!]]
             [clojure.tools.logging :as log]
             [simulant.http :as http])
-  (:import [java.io ByteArrayInputStream ByteArrayOutputStream FileOutputStream InputStream]
+  (:import [java.io
+            ByteArrayInputStream
+            ByteArrayOutputStream
+            FileOutputStream
+            InputStream]
            [java.nio.file CopyOption Files]))
 
-;;; Helper functionaltiy
-
-(defn erlang
-  [mean]
-  (- (* (Math/log (rand)) mean)))
 
 ;;; Generation
 
 (defn generate-activity-streams
-  "Generates timestamped requests to a web service described by `spec`
-  and records them using `recorder`. Does not actually issue the
-  requests to produce responses."
-  [{:keys [spec agent-count interarrival-sec duration-sec recorder]
+  "Generates timestamped requests to a web service via `generator`, an
+  instance of
+  `com.cognitect.requestinator.generators.RequestGenerator` and
+  records them using `recorder`. Does not actually issue the requests
+  to produce responses."
+  [{:keys [::r/spec ::r/duration ::r/agent-groups :recorder]
     :as opts}]
-  (->> (for [agent-id (range agent-count)]
-         (loop [[request & more]      (swagger/generate spec)
-                t                     (erlang interarrival-sec)
+  (->> (for [{:keys [::agent/count ::agent/tag ::agent/generator]} agent-groups
+             agent-num (range count)
+             :let [agent-id (format "%s-%04d" tag agent-num)]]
+         (loop [[{:keys [::gen/t ::gen/request]} & more] (gen/generate generator spec)
                 agent-info            {}]
-           (if (< duration-sec t)
+           (if (or (nil? request) (< duration t))
              [agent-id agent-info]
-             (let [path (format "%04d/%010d.transit"
+             (let [path (format "%s/%010d.transit"
                                 agent-id
                                 (long (* t 1000)))]
                (recorder path
                          (ser/encode request))
                (recur more
-                      (+ t (erlang interarrival-sec))
                       (assoc-in agent-info
                                 [:requests t]
                                 path))))))
@@ -142,8 +145,9 @@
   taking available maps and passing them to `record-f` a function of
   two arguments: a relative path and a byte array of data.
 
-  Closes the channel `status` when `chans` have all closed."
-  [chans record-f status]
+  Sends the summary index to channel `->consolidator` and closes it
+  when `chans` have all closed."
+  [chans record-f ->consolidator]
   (let [worker (Thread.
                 (fn []
                   (try
@@ -151,8 +155,8 @@
                            index []]
                       (if (empty? chans)
                         (do
-                          (record-f "index.transit" (ser/encode index))
-                          (async/close! status))
+                          (>!! ->consolidator index)
+                          (async/close! ->consolidator))
                         (let [[val port] (async/alts!! (seq chans))]
                           (if (nil? val)
                             (do
@@ -173,6 +177,33 @@
                                                       (get-in val [:response :status]))))))))))
                     (catch Throwable t
                       (log/error t "Error in recorder.")))))]
+    (.start worker)
+    {::worker worker}))
+
+(defn create-consolidator
+  "Returns a running consolidator whose job it is to collate the
+  indexes received from `chans` and write them to index.transit once
+  they have all closed. Closes channel `status` when done."
+  [chans record-f status]
+  (let [worker (Thread.
+                (fn []
+                  (try
+                    (loop [chans (set chans)
+                           index []]
+                      (if (empty? chans)
+                        (record-f "index.transit" (ser/encode index))
+                        (let [[val port] (async/alts!! (seq chans))]
+                          (if (nil? val)
+                            (do
+                              (log/debug "Consolidator removing a completed channel."
+                                         :remaining (dec (count chans)))
+                              (recur (disj chans port) index))
+                            (recur chans (into index val))))))
+                    (async/close! status)
+                    (catch Throwable t
+                      (log/error t "Error in consolidator.")
+                      (>!! status [:exception t])
+                      (async/close! status)))))]
     (.start worker)
     {::worker worker}))
 
@@ -197,10 +228,13 @@
                          :throttler   (create-throttler start ->throttler ->agent)
                          :agent       (create-agent ->agent ->recorder)}))
         ->recorders  (map :->recorder processes)
+        ->consolidators (repeatedly recorder-concurrency #(async/chan 10))
         status       (async/chan)]
     {:processes (into [] processes)
-     :recorder  (into [] (repeatedly recorder-concurrency
-                                     #(create-recorder ->recorders record-f status)))
+     :consolidator (create-consolidator ->consolidators record-f status)
+     :recorder  (->> ->consolidators
+                     (map #(create-recorder ->recorders record-f %))
+                     (into []))
      :status     status}))
 
 ;;; Reporting

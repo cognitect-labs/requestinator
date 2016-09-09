@@ -5,7 +5,10 @@
             [clojure.string :as str]
             [clojure.test.check :as c]
             [clojure.test.check.generators :as gen]
+            [clojure.tools.logging :as log]
             [com.cognitect.requestinator.json :as json-helper]
+            [com.cognitect.requestinator.math :as math]
+            [com.cognitect.requestinator.serialization :as ser]
             [com.gfredericks.test.chuck.generators :as chuck-gen])
   (:import [java.util Base64]
            [java.net URLEncoder]))
@@ -199,21 +202,27 @@
 (defn request-generator
   "Given a Swagger spec, return a generator that will create a random
   request map against one of the operations in it."
-  [spec]
-  (let [{:strs [host basePath schemes definitions paths]} spec]
-    (gen/let [[op op-description]         (gen/elements paths)
-              [method method-description] (gen/elements op-description)
-              mime-type                   (gen/elements (get method-description "consumes" [nil]))
-              scheme                      (gen/elements schemes)
-              params                      (params-generator spec
-                                                            (get method-description "parameters"))]
-      (request {:host      host
-                :scheme    scheme
-                :base-path basePath
-                :op        op
-                :method    method
-                :mime-type mime-type
-                :params    params}))))
+  ([spec] (request-generator spec {}))
+  ([spec params]
+   (let [{:keys [path method]} params
+         {:strs [host basePath schemes definitions paths]} spec]
+     (gen/let [[op op-description]         (if path
+                                             (gen/return [path (get paths path)])
+                                             (gen/elements paths))
+               [method method-description] (if method
+                                             (gen/return [method (get op-description method)])
+                                             (gen/elements op-description))
+               mime-type                   (gen/elements (get method-description "consumes" [nil]))
+               scheme                      (gen/elements schemes)
+               params                      (params-generator spec
+                                                             (get method-description "parameters"))]
+       (request {:host      host
+                 :scheme    scheme
+                 :base-path basePath
+                 :op        op
+                 :method    method
+                 :mime-type mime-type
+                 :params    params})))))
 
 (defn generate
   "Given a Swagger spec, return a lazy sequence of Ring request maps
@@ -223,6 +232,34 @@
   ;; number of Swagger specs I tried, 30 seems to do a decent job of
   ;; generating "interesting" requests often enough. But we probably
   ;; need to expose `max-size` from the command line eventually.
-  ([spec] (generate spec 30))
-  ([spec max-size]
-   (gen/sample-seq (request-generator spec) max-size)))
+  ([spec interarrival-sec] (generate spec interarrival-sec 30))
+  ([spec interarrival-sec max-size]
+   (map (fn [t request]
+          {:com.cognitect.requestinator.generators/t t
+           :com.cognitect.requestinator.generators/request request})
+        (reductions + (repeatedly #(math/erlang interarrival-sec)))
+        (gen/sample-seq (request-generator spec) max-size))))
+
+;; TODO: Update this code so that the spec and amendments can be
+;; embedded literally in the spec file rather than us assuming they're
+;; URLs.
+(defn read-spec
+  [base-uri {:keys [base amendments]}]
+  (log/debug "read-spec" :base-uri base-uri :base base :amendments amendments)
+  (let [spec       (->> base
+                        (ser/resolve-relative base-uri)
+                        slurp
+                        json/read-str)
+        amendments (some->> amendments
+                            (ser/resolve-relative base-uri)
+                            slurp
+                            json/read-str)]
+    (json-helper/amend spec amendments)))
+
+(defn readers
+  [base-uri]
+  {'requestinator.spec/swagger #(read-spec base-uri %)
+   ;; For now, read URLs as strings, since we're not set up to include
+   ;; specs as literals.
+   'url identity})
+

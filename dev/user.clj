@@ -6,17 +6,19 @@
             [clojure.java.io :as io]
             [clojure.pprint :refer [pprint]]
             [clojure.repl :refer :all]
-            [clojure.test.check.generators :as gen]
+            [clojure.test.check.generators :as tcgen]
             [clojure.tools.logging :as log]
             [clojure.tools.namespace.repl :refer [refresh refresh-all]]
             [com.cognitect.requestinator.engine :refer :all]
+            [com.cognitect.requestinator.generators :as gen]
+            [com.cognitect.requestinator.generators.markov :as markov]
             [com.cognitect.requestinator.json :as json-helper]
             [com.cognitect.requestinator.html :as h]
             [com.cognitect.requestinator.main :as main]
             [com.cognitect.requestinator.report :as report]
             [com.cognitect.requestinator.s3 :as s3]
             [com.cognitect.requestinator.serialization :as ser]
-            [com.cognitect.requestinator.swagger :refer :all]
+            [com.cognitect.requestinator.swagger :as swagger]
             [com.gfredericks.test.chuck.generators :as chuck-gen]
             [simulant.http :as http]))
 
@@ -48,17 +50,17 @@
   [spec op method]
   (->> spec
        (get-in spec ["paths" op method "parameters"])
-       (params-generator spec)
-       gen/generate))
+       (swagger/params-generator spec)
+       tcgen/generate))
 
 (defn generate-request
   [{:keys [spec op method mime-type]
     :as opts}]
   (let [{:strs [host basePath schemes]} spec]
-    (request (-> {:mime-type (gen/generate (gen/elements (get-in spec ["paths" op method "consumes"])))
+    (swagger/request (-> {:mime-type (tcgen/generate (tcgen/elements (get-in spec ["paths" op method "consumes"])))
                   :host      host
                   :base-path basePath
-                  :scheme    (gen/generate (gen/elements schemes))}
+                  :scheme    (tcgen/generate (tcgen/elements schemes))}
                  (merge opts)
                  (assoc :params (generate-params spec op method))))))
 

@@ -1,0 +1,33 @@
+{:requestinator/spec
+ #requestinator.spec/swagger
+ {:base #url "http://petstore.swagger.io/v2/swagger.json"
+  :amendments nil                       ; Optional
+  }
+ :requestinator/duration #seconds 30
+ :requestinator/agent-groups
+ [{:requestinator.agent/count 3
+   :requestinator.agent/tag "uniform"
+   :requestinator.agent/generator
+   #requestinator.generators/uniform
+   {:interarrival-sec 1}}
+  {:requestinator.agent/count 5
+   :requestinator.agent/tag "markov"
+   :requestinator.agent/generator
+   #requestinator.generators/markov
+   {:requests {:query-by-status {:path "/pet/findByStatus"
+                                 :method "get"}
+               :query-by-tags   {:path "/pet/findByTags"
+                                 :method "get"}
+               :pet-by-id       {:path   "/pet/{petId}"
+                                 :method "get"}}
+    :graph    {:start           [{:query-by-status {:weight 1
+                                                    :delay (constant 1)}
+                                  :query-by-tags   {:weight 1
+                                                    :delay (constant 2)}}]
+               :query-by-status [{:pet-by-id     {:weight 1
+                                                  :delay  (erlang 10)}
+                                  :query-by-tags {:weight 1
+                                                  :delay  (erlang 10)}}]
+               :query-by-tags   [{:pet-by-id {:weight 1
+                                              :delay  (erlang 10)}}]}}}]}
+

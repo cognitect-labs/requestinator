@@ -16,9 +16,11 @@
                   :exclusions [com.fasterxml.jackson.core/jackson-core]]
                  [com.stuartsierra/log.dev "0.1.0"]
                  [org.clojure/tools.cli "0.3.3"]
-                 [org.apache.commons/commons-lang3 "3.4"]]
+                 [org.apache.commons/commons-lang3 "3.4"]
+                 [org.craigandera/causatum "0.3.0"]]
   :main ^:skip-aot com.cognitect.requestinator.main
   :repl-options {:init-ns user}
+  :source-paths ["src" "spec"]
   :profiles {:dev {:dependencies [[org.clojure/tools.namespace "0.2.11"]]
                    :source-paths ["dev"]
                    :jvm-opts ["-Xloggc:/tmp/gc.log"]}

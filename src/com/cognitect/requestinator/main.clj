@@ -2,38 +2,15 @@
   "An interface for external (command-line) invocation of
   requestinator functionality."
   (:require [clojure.core.async :refer [<!!] :as async]
-            [clojure.data.json :as json]
+            [clojure.edn :as edn]
             [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.tools.logging :as log]
             [com.cognitect.requestinator.engine :as engine]
-            [com.cognitect.requestinator.json :as json-helper]
+            [com.cognitect.requestinator.generators :as gen]
             [com.cognitect.requestinator.report :as report]
-            [com.cognitect.requestinator.s3 :as s3]
-            [com.cognitect.requestinator.serialization :as ser]))
-
-(comment
- (def cli-options
-   [["-e" "--env ENV_FILE" "Environment file"
-     :id :env-file]
-    ["-r" "--report-dir DIRECTORY" "Directory to write the report to"
-     :id :report-dir]
-    ["-s" "--show-report" "Opens the generated report in the default browser when the test ends"]
-    ["-t" "--test-cases TEST_CASE_FILE" "Optional test cases file; a CSV. See README for format, and test-cases-example.csv"
-     :id :cases-file]
-    ["-c" "--data-consistency" "Runs the data consistency validation rules."
-     :id :data-consistency?]
-    [nil "--db-uri DB_URI" "The Datomic database URI to use. Defaults to an in-memory database."
-     :id :db-uri]
-    [nil "--script-types SCRIPT_TYPES" "The type of scripts to run. Specify multiple values with distinct flag/value pairs. Accepts \"web\", \"android\". Defaults to \"web\"."
-     :id :script-types
-     :assoc-fn (fn [m k v] (update-in m [k] conj (keyword v)))
-     :validate [(partial contains? #{"web" "android"})
-                "Accepts \"web\", \"android\"."]]
-    [nil "--bash-properties PROPS_FILE" "Optional. Path to a file where properties of the run will be written as Bash-compatible properties."
-     :id :bash-properties]
-    [nil "--git-sha GIT_SHA" "Optional. The git SHA of the running code. Used to cache previously-generated reports."]
-    ["-h" "--help"]]))
+            [com.cognitect.requestinator.serialization :as ser]
+            [com.cognitect.requestinator.swagger :as swagger]))
 
 (defn exit [status msg]
   (println msg)
@@ -54,73 +31,38 @@
   (str "The following errors occurred while parsing your command:\n\n"
        (str/join \newline errors)))
 
-(defn read-spec
-  [spec-uri amendments-uri]
-  (let [spec       (->> spec-uri
-                        slurp
-                        json/read-str)
-        amendments (some->> amendments-uri
-                            slurp
-                            json/read-str)]
-    (json-helper/amend spec amendments)))
-
-(defn parse-uri
-  [uri]
-  (cond
-    (.startsWith uri "file:///")
-    {:type :file
-     :dir (subs uri (count "file://"))}
-
-    (.startsWith uri "file:")
-    {:type :file
-     :dir (subs uri (count "file:"))}
-
-    (.startsWith uri "s3://")
-    (let [without-proto (subs uri (count "s3://"))
-          [bucket & paths] (str/split without-proto #"/")]
-      {:type   :s3
-       :bucket bucket
-       :prefix (str/join "/" paths)})
-
-    :else
-    (throw (ex-info (str "Unsupported destination: " uri)
-                    {:reason ::unsupported-destination
-                     :uri    uri}))))
-
-(defn create-recorder
-  [uri]
-  (let [{:keys [type dir bucket prefix]} (parse-uri uri)]
-    (case type
-      :file (ser/file-recorder dir)
-      :s3 (ser/s3-recorder (s3/client) bucket prefix))))
-
-(defn create-fetcher
-  [uri]
-  (let [{:keys [type dir bucket prefix]} (parse-uri uri)]
-    (case type
-      :file (ser/file-fetcher dir)
-      :s3 (ser/s3-fetcher (s3/client) bucket prefix))))
+(defn read-params
+  [params-uri]
+  (let [fetcher (ser/create-fetcher params-uri)]
+    (->> (fetcher "")
+         String.
+         (edn/read-string
+          {:readers
+           (merge gen/readers
+                  {'requestinator.spec/swagger #(swagger/read-spec params-uri %)
+                   'seconds                    identity
+                   'minutes                    #(/ % 60)
+                   'hours                      #(/ % 60 60)
+                   ;; For now, just read URLs as strings
+                   'url                        identity})}))))
 
 (defn generate
-  [{:keys [spec-uri amendments-uri destination agent-count interarrival-sec duration-sec]
+  [{:keys [destination
+           params-uri]
     :as options}
    arguments]
   (log/debug "Generate" :options options)
-  (let [spec     (read-spec spec-uri amendments-uri)
-        recorder (create-recorder destination)]
-   (engine/generate-activity-streams {:spec             spec
-                                      :agent-count      agent-count
-                                      :interarrival-sec interarrival-sec
-                                      :duration-sec     duration-sec
-                                      :recorder         recorder}))
+  (let [recorder (ser/create-recorder destination)
+        params (read-params params-uri)]
+    (engine/generate-activity-streams (assoc params :recorder recorder)))
   {:code    0
    :message "Success"})
 
 (defn execute
   [{:keys [source destination start recorder-concurrency] :as options} arguments]
   (log/debug "Execute" :options)
-  (let [fetcher  (create-fetcher source)
-        recorder (create-recorder destination)
+  (let [fetcher  (ser/create-fetcher source)
+        recorder (ser/create-recorder destination)
         {:keys [status]} (engine/execute {:fetch-f              fetcher
                                           :record-f             recorder
                                           ;; There is support in the API for delaying the
@@ -140,36 +82,22 @@
 (defn report
   [{:keys [source destination] :as options} arguments]
   (println "Building report" :source source :destination destination)
-  (let [fetcher (create-fetcher source)
-        recorder (create-recorder destination)]
+  (let [fetcher (ser/create-fetcher source)
+        recorder (ser/create-recorder destination)]
     (report/report {:fetch-f fetcher
                     :record-f recorder}))
   {:code 0
    :message "Success"})
 
 (def commands
-  {"generate" {:cli-spec [["-s" "--spec-uri SWAGGERURI" "Path to Swagger JSON spec"
-                           :id :spec-uri
+  {"generate" {:cli-spec [["-d" "--destination DESTINATION" "Path to destination for generated requests"
+                           :id :destination
                            :validate [some? "Required"]]
-                          ["-a" "--amendments-uri AMENDMENTSURI" "Path to spec amendments"
-                           :id :amendments-uri]
-                          ["-d" "--destination DESTINATION" "Path to destination for generated requests"
-                           :id :destination]
-                          ["-n" "--agent-count AGENT_COUNT" "Number of agents to use"
-                           :id :agent-count
-                           :parse-fn #(Long. %)
-                           :validate [integer? "Must be an integer"]]
-                          ["-i" "--interarrival-sec INTERARRIVAL_SEC"
-                           "Mean of interval between requests, per agent, in seconds."
-                           :id :interarrival-sec
-                           :parse-fn #(Double. %)
-                           :validate [number? "Must a number."]]
-                          ["-t" "--duration-sec DURATION_SEC"
-                           "Duration of activity stream, in seconds."
-                           :id :duration-sec
-                           :parse-fn #(Double. %)
-                           :validate [number? "Must a number."]]]
-              :impl generate}
+                          ["-p" "--params PARAMS_LOCATION"
+                           "Location of parameters file"
+                           :id :params
+                           :validate [some? "Required"]]]
+               :impl generate}
    "execute" {:cli-spec [["-s" "--source REQUEST_SOURCE" "Path to location of requests"
                           :id :source]
                          ["-d" "--destination DESTINATION" "Path to destination for results"

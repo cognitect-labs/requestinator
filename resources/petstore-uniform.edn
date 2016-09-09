@@ -1,0 +1,11 @@
+{:requestinator/spec
+ #requestinator.spec/swagger
+ {:base #url "http://petstore.swagger.io/v2/swagger.json"
+  :amendments nil}
+ :requestinator/duration #minutes 5
+ :requestinator/agents
+ [{:requestinator.agents/count 3
+   :requestinator.agents/tag "uniform"
+   :requestinator.agents/generator
+   #requestinator.generators/uniform
+   {:interarrival-sec 1}}]}

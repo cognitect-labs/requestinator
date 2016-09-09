@@ -12,7 +12,7 @@
   given item."
   [{:keys [agent-id t] :as item}]
   ;; TODO: Change
-  (format "detail/%04d/%010d.html"
+  (format "detail/%s/%010d.html"
           agent-id
           (long (* t 1000))))
 
@@ -35,19 +35,22 @@
        [:script {:src "../../js/report.js"
                  :type "text/javascript"}]]
       [:body
-       (let [data (group-by :agent-id index)
+       (let [agent-numbers (zipmap (->> index
+                                        (map :agent-id)
+                                        distinct
+                                        sort)
+                                   (range))
+             data (group-by :agent-id index)
              max-t (->> index
                         (map :t)
                         (reduce max)
                         (+ 0.25))
-             max-agent (->> index
-                            (map :agent-id)
-                            (reduce max)
-                            inc)]
+             max-agent (count data)]
          [:div#timeline-container
           [:svg {:xmlns "http://www.w3.org/2000/svg"
                  "xmlns:svg" "http://www.w3.org/2000/svg"
                  :id "timeline"
+                 :agent-numbers agent-numbers
                  :max-agent max-agent
                  :max-t max-t
                  ;; TODO: This is sort of an arbitrary heuristic. Can we fix it?
@@ -55,11 +58,12 @@
                  :preserveAspectRatio "none"}
            [:g#timeline-content
             ;; Row highlights
-            (for [[agent-id items] (sort-by first data)]
+            (for [[agent-id items] (sort-by first data)
+                  :let [agent-num (agent-numbers agent-id)]]
               [[:rect {:class (str "timeline-outline "
-                                   (if (odd? agent-id) "odd" "even"))
+                                   (if (odd? agent-num) "odd" "even"))
                        :x 0
-                       :y agent-id
+                       :y agent-num
                        :width max-t
                        :height 0.99}]])
             (for [x (range 0 max-t)]
@@ -91,7 +95,8 @@
             [:rect#highlight-y {:x 0 :y 0 :width 0 :height max-agent}]
             ;; The actual data points
             (for [[agent-id items] (sort-by first data)
-                  {:keys [t status path duration] :as item} items]
+                  {:keys [t status path duration] :as item} items
+                  :let [agent-num (agent-numbers agent-id)]]
               (let [status-class (format "status%dxx" (-> status (/ 100) long))]
                 [:g
                  {:class "timeline-cell"
@@ -99,14 +104,14 @@
                  [:rect
                   {:class (str "timeline-rect " status-class)
                    :x t
-                   :y (+ agent-id 0.1)
+                   :y (+ agent-num 0.1)
                    :width duration
                    :height 0.8}]
                  [:path {:class (str "timeline-handle " status-class)
                          :d (format "M%f %f L%f %f L%f %f z"
-                                    (+ t duration) (+ agent-id 0.1)
-                                    (+ t duration 0.1) (+ agent-id 0.5)
-                                    (+ t duration) (+ agent-id 0.9))}]]))]]])
+                                    (float (+ t duration)) (+ agent-num 0.1)
+                                    (float (+ t duration 0.1)) (+ agent-num 0.5)
+                                    (float (+ t duration)) (+ agent-num 0.9))}]]))]]])
        [:div#detail-container
         [:iframe#detail]]
        [:script {:type "text/javascript"}
@@ -291,7 +296,7 @@
          w
          [:html
           [:head
-           [:title (format "Requestinator report - Agent %d, Time %f" agent-id t)]
+           [:title (format "Requestinator report - Agent %s, Time %f" agent-id (float t))]
            [:link {:href "../../css/style.css"
                    :rel  "stylesheet"
                    :type "text/css"}]
@@ -303,16 +308,16 @@
            [:div.details
             (if-not request
               [:div.error
-               (format "No request data found. Agent %d, time %f"
-                       agent-id t)]
+               (format "No request data found. Agent %s, time %f"
+                       agent-id (float t))]
               [:div.request
                (request-line request)
                (headers request)
                (body request)])
             (if-not response
               [:div.error
-               (format "No response data found. Agent %d, time %f"
-                       agent-id t)]
+               (format "No response data found. Agent %s, time %f"
+                       agent-id (float t))]
               [:div.response
                (response-line response)
                (headers response)
