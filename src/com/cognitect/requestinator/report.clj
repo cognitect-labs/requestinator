@@ -185,8 +185,9 @@
    [:span.method (or (some-> request :method name .toUpperCase) "<<none>>")]
    [:span.url (let [uri (-> request :url java.net.URI.)]
                 (str (.getPath uri)
-                     (when-let [q (.getQuery uri)]
-                       (str "?" q))))]
+                     (let [q (:query-string request)]
+                       (when-not (empty? q)
+                         (str "?" q)))))]
    [:span.version "HTTP/1.1"]
    [:button.curl-button.lightbox-trigger
     {:data-lightbox-id "curl-lightbox"
@@ -245,7 +246,7 @@
   [:div.body
    (let [body (-> r :body)]
      (cond
-       (empty? body) [:div.nobody "((Ooooohhhh, I ain't got no body...))"]
+       (empty? body) [:div.nobody "Body was empty"]
        (json-content? r) (json-body body)
        :else [:pre body]))])
 
