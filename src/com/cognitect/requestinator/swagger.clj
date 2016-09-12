@@ -199,12 +199,24 @@
                                json/write-str)
                      formData (format-form-data mime-type formData))}))
 
+(defn override-params
+  "Updates `base`, a sequence of parameter maps, with values
+  overridden per `overrides`."
+  [base overrides]
+  (log/debug "override-params" :base base :overrides overrides)
+  (mapv (fn [param]
+          (let [n (get param "name")]
+            (if-let [o (get overrides n)]
+              (assoc param :value o)
+              param)))
+        base))
+
 (defn request-generator
   "Given a Swagger spec, return a generator that will create a random
   request map against one of the operations in it."
   ([spec] (request-generator spec {}))
   ([spec params]
-   (let [{:keys [path method]} params
+   (let [{:keys [path method param-overrides]} params
          {:strs [host basePath schemes definitions paths]} spec]
      (gen/let [[op op-description]         (if path
                                              (gen/return [path (get paths path)])
@@ -216,13 +228,13 @@
                scheme                      (gen/elements schemes)
                params                      (params-generator spec
                                                              (get method-description "parameters"))]
-       (request {:host      host
-                 :scheme    scheme
-                 :base-path basePath
-                 :op        op
-                 :method    method
-                 :mime-type mime-type
-                 :params    params})))))
+       {:host      host
+        :scheme    scheme
+        :base-path basePath
+        :op        op
+        :method    method
+        :mime-type mime-type
+        :params    (override-params params param-overrides)}))))
 
 (defn generate
   "Given a Swagger spec, return a lazy sequence of Ring request maps

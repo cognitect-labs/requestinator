@@ -5,6 +5,7 @@
             [com.cognitect.requestinator.generators :as gen]
             [com.cognitect.requestinator.report :as report]
             [com.cognitect.requestinator.serialization :as ser]
+            [com.cognitect.requestinator.swagger :as swagger]
             [com.cognitect.requestinator.thread-pool :as thread-pool]
             [com.stuartsierra.component :as component]
             [requestinator :as r]
@@ -122,12 +123,15 @@
                     (loop []
                       (when-let [{:keys [request] :as request-info} (<!! input-chan)]
                         (log/debug "Agent requesting" :path (:path request-info))
-                        (let [start (System/currentTimeMillis)
-                              result (client request)
+                        (let [request* (swagger/request request)
+                              start (System/currentTimeMillis)
+                              result (client request*)
                               stop (System/currentTimeMillis)
                               duration (/ (- stop start) 1000.0)]
                           (>!! output-chan
                                (assoc request-info
+                                      :request request*
+                                      :request-template request
                                       :response result
                                       :duration duration)))
                         (recur)))

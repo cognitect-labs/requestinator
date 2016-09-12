@@ -144,12 +144,16 @@
               :destination "file:///tmp/requestinator/reports"}
              [])
 
+(clojure.java.shell/sh "open" "/tmp/requestinator/reports/main/html/index.html")
+
 (let [fetcher (ser/create-fetcher
-               #_"file://tmp/requestinator"
-               "file://tmp/requestinator/results")]
-  (->> "index.transit"
-      fetcher
-      ser/decode
-      (map :agent-id)
-      distinct
-      sort))
+               "file://tmp/requestinator"
+               #_"file://tmp/requestinator/results")]
+  (->> #_"index.transit"
+       "markov-0000/0000002000.transit"
+       fetcher
+       ser/decode
+       #_(map :agent-id)
+       #_distinct
+       #_sort
+       pprint))

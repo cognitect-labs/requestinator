@@ -15,11 +15,13 @@
    :requestinator.agent/generator
    #requestinator.generators/markov
    {:requests {:query-by-status {:path "/pet/findByStatus"
-                                 :method "get"}
+                                 :method "get"
+                                 :param-overrides {"status" ["available"]}}
                :query-by-tags   {:path "/pet/findByTags"
                                  :method "get"}
                :pet-by-id       {:path   "/pet/{petId}"
-                                 :method "get"}}
+                                 :method "get"
+                                 :param-overrides {"petId" 42}}}
     :graph    {:start           [{:query-by-status {:weight 1
                                                     :delay (constant 1)}
                                   :query-by-tags   {:weight 1

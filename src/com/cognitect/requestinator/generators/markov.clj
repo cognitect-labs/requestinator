@@ -3,6 +3,7 @@
   requests."
   (:require [causatum.event-streams :as es]
             [clojure.test.check.generators :as tcgen]
+            [clojure.tools.logging :as log]
             [com.cognitect.requestinator.math :as math]
             [com.cognitect.requestinator.swagger :as swagger]))
 
