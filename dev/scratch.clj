@@ -129,6 +129,16 @@
      (take 10)
      pprint)
 
+;; Danger, Will Robinson!!!
+(->> "/tmp/requestinator"
+     io/file
+     file-seq
+     (remove #(#{"." ".."} (.getName %)))
+     (sort-by #(-> % .getPath count))
+     reverse
+     (map #(.delete %))
+     dorun)
+
 (main/generate {:destination "file:///tmp/requestinator/"
                 :params-uri "resources/petstore-mixed.edn"}
                [])
@@ -150,10 +160,13 @@
                "file://tmp/requestinator"
                #_"file://tmp/requestinator/results")]
   (->> #_"index.transit"
-       "markov-0000/0000002000.transit"
+       "markov-0000/0000011085.transit"
        fetcher
        ser/decode
        #_(map :agent-id)
        #_distinct
        #_sort
-       pprint))
+       :store
+       first
+       val
+       seq?))

@@ -5,12 +5,14 @@
             [com.cognitect.requestinator.generators :as gen]
             [com.cognitect.requestinator.report :as report]
             [com.cognitect.requestinator.serialization :as ser]
+            [com.cognitect.requestinator.sexp :as sexp]
             [com.cognitect.requestinator.swagger :as swagger]
             [com.cognitect.requestinator.thread-pool :as thread-pool]
             [com.stuartsierra.component :as component]
             [requestinator :as r]
             [requestinator.agent :as agent]
             [clojure.core.async :as async :refer [>!! <!!]]
+            [clojure.data.json :as json]
             [clojure.tools.logging :as log]
             [simulant.http :as http])
   (:import [java.io
@@ -110,31 +112,68 @@
     (.start worker)
     {::worker worker}))
 
+(defmulti storage-op (fn [op op-context & args] op))
+
+(defmethod storage-op 'response-body-json
+  [op {:keys [response]} path]
+  (-> response
+      :body
+      json/read-str
+      (json-helper/select path)))
+
+(defn things-to-store
+  "Returns a map of values to be stored in the agent context."
+  [{:keys [agent-memory request-template request response] :as context}]
+  (let [{:keys [store]} request-template]
+    (into {}
+          (for [[k v] store]
+            [k (sexp/eval v
+                          #(get context %)
+                          (fn [op args]
+                            (apply storage-op op context args)))]))))
+
+(defmethod swagger/dynamic-param-op 'recall
+  [op context k default]
+  (log/debug "recall" :op op :context context :k k :default default)
+  ;; TODO: Is this really what we want? Unfortunately we don't have a
+  ;; way at the moment to distinguish between someone intentionally
+  ;; storing nil and someone storing nil because a parameter wasn't
+  ;; present or something.
+  (or (get context k) default))
+
 (defn create-agent
   "Returns a running agent that will consume request info maps from
   `input-chan` and execute them, placing the result on `output-chan`.
   Stops when `input-chan` closes, at which point it closes
   `output-chan`."
-  [input-chan output-chan]
+  [start input-chan output-chan]
   (let [client (http/generate-client (http/cookie-store))
         worker (Thread.
                 (fn []
                   (try
-                    (loop []
+                    (loop [agent-memory {}]
+                      (log/debug "agent-memory" agent-memory)
                       (when-let [{:keys [request] :as request-info} (<!! input-chan)]
                         (log/debug "Agent requesting" :path (:path request-info))
-                        (let [request* (swagger/request request)
-                              start (System/currentTimeMillis)
-                              result (client request*)
-                              stop (System/currentTimeMillis)
-                              duration (/ (- stop start) 1000.0)]
+                        (let [request-template request
+                              request (swagger/request request-template agent-memory)
+                              actual-t (elapsed start)
+                              begin (System/currentTimeMillis)
+                              response (client request)
+                              end (System/currentTimeMillis)
+                              duration (/ (- end begin) 1000.0)]
                           (>!! output-chan
                                (assoc request-info
-                                      :request request*
-                                      :request-template request
-                                      :response result
-                                      :duration duration)))
-                        (recur)))
+                                      :actual-t actual-t
+                                      :request request
+                                      :request-template request-template
+                                      :response response
+                                      :duration duration))
+                          (recur (merge agent-memory
+                                        (things-to-store {:agent-memory agent-memory
+                                                          :request-template request-template
+                                                          :request request
+                                                          :response response}))))))
                     (catch Throwable t
                       (log/error t "Error in agent"))
                     (finally
@@ -230,7 +269,7 @@
                          :->recorder  ->recorder
                          :fetcher     (create-fetcher  request-infos ->throttler fetch-f)
                          :throttler   (create-throttler start ->throttler ->agent)
-                         :agent       (create-agent ->agent ->recorder)}))
+                         :agent       (create-agent start ->agent ->recorder)}))
         ->recorders  (map :->recorder processes)
         ->consolidators (repeatedly recorder-concurrency #(async/chan 10))
         status       (async/chan)]

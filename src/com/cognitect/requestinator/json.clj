@@ -17,9 +17,10 @@
   [doc ^String pointer]
   ;; TODO: Implement spec more completely.
   (reduce (fn [context segment]
-            (if (= "" segment)
-              context
-              (get context segment)))
+            (cond
+              (= "" segment) context
+              (re-matches #"\d+" segment) (get context (Long. segment))
+              :else (get context segment)))
           doc
           (path-segments pointer)))
 

@@ -16,20 +16,23 @@
    #requestinator.generators/markov
    {:requests {:query-by-status {:path "/pet/findByStatus"
                                  :method "get"
-                                 :param-overrides {"status" ["available"]}}
+                                 :param-overrides {"status" ["available"]}
+                                 :store {}}
                :query-by-tags   {:path "/pet/findByTags"
-                                 :method "get"}
+                                 :method "get"
+                                 :param-overrides {"tags" ["tag1"]}
+                                 :store {"pet-id" (response-body-json "#/0/id")}}
                :pet-by-id       {:path   "/pet/{petId}"
                                  :method "get"
-                                 :param-overrides {"petId" 42}}}
+                                 :param-overrides {"petId" (recall "pet-id" 42)}}}
     :graph    {:start           [{:query-by-status {:weight 1
-                                                    :delay (constant 1)}
+                                                    :delay (constant #seconds 1)}
                                   :query-by-tags   {:weight 1
-                                                    :delay (constant 2)}}]
+                                                    :delay (constant #seconds 2)}}]
                :query-by-status [{:pet-by-id     {:weight 1
-                                                  :delay  (erlang 10)}
+                                                  :delay  (erlang #seconds 10)}
                                   :query-by-tags {:weight 1
-                                                  :delay  (erlang 10)}}]
+                                                  :delay  (erlang #seconds 10)}}]
                :query-by-tags   [{:pet-by-id {:weight 1
-                                              :delay  (erlang 10)}}]}}}]}
+                                              :delay  (erlang #seconds 10)}}]}}}]}
 

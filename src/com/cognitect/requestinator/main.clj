@@ -76,6 +76,7 @@
       (when-let [msg (<!! status)]
         (println msg)
         (recur)))
+    (log/info "Execution complete")
     {:code    0
      :message "Success"}))
 

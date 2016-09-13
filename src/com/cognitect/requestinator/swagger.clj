@@ -9,6 +9,7 @@
             [com.cognitect.requestinator.json :as json-helper]
             [com.cognitect.requestinator.math :as math]
             [com.cognitect.requestinator.serialization :as ser]
+            [com.cognitect.requestinator.sexp :as sexp]
             [com.gfredericks.test.chuck.generators :as chuck-gen])
   (:import [java.util Base64]
            [java.net URLEncoder]))
@@ -168,9 +169,29 @@
          multipart-boundary
          "--")))
 
+(defmulti dynamic-param-op (fn [op context & args] op))
+
+(defn resolve-dynamic-params
+  [context params]
+  (map (fn [param]
+         (update param
+                 :value
+                 (fn [expr]
+                   (sexp/eval expr
+                              ;; TODO: It might make sense to resolve
+                              ;; symbols to stored values at some
+                              ;; point
+                              (fn [_] (throw (ex-data "Symbols have no value in this context"
+                                                      {:reason ::cannot-resolve-symbol
+                                                       :expr expr})))
+                              (fn [op args]
+                                (apply dynamic-param-op op context args))))))
+       params))
+
 (defn request
-  [{:keys [host scheme base-path op method params mime-type]}]
-  (let [{:strs [query header path formData body]} (group-by #(get % "in") params)]
+  [{:keys [host scheme base-path op method params mime-type]} context]
+  (let [params (resolve-dynamic-params context params)
+        {:strs [query header path formData body]} (group-by #(get % "in") params)]
     {:url          (format "%s://%s%s%s"
                            scheme
                            host
@@ -216,7 +237,7 @@
   request map against one of the operations in it."
   ([spec] (request-generator spec {}))
   ([spec params]
-   (let [{:keys [path method param-overrides]} params
+   (let [{:keys [path method param-overrides store]} params
          {:strs [host basePath schemes definitions paths]} spec]
      (gen/let [[op op-description]         (if path
                                              (gen/return [path (get paths path)])
@@ -234,7 +255,8 @@
         :op        op
         :method    method
         :mime-type mime-type
-        :params    (override-params params param-overrides)}))))
+        :params    (override-params params param-overrides)
+        :store     store}))))
 
 (defn generate
   "Given a Swagger spec, return a lazy sequence of Ring request maps
