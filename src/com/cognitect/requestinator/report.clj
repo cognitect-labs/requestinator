@@ -42,7 +42,7 @@
                                    (range))
              data (group-by :agent-id index)
              max-t (->> index
-                        (map :t)
+                        (map :actual-t)
                         (reduce max)
                         (+ 0.25))
              max-agent (count data)]
@@ -95,18 +95,24 @@
             [:rect#highlight-y {:x 0 :y 0 :width 0 :height max-agent}]
             ;; The actual data points
             (for [[agent-id items] (sort-by first data)
-                  {:keys [t status path duration] :as item} items
+                  {:keys [actual-t t status path duration] :as item} (sort-by :actual-t items)
                   :let [agent-num (agent-numbers agent-id)]]
               (let [status-class (format "status%dxx" (-> status (/ 100) long))]
                 [:g
                  {:class "timeline-cell"
                   :data-detail-uri (str "../../" (detail-uri item))}
                  [:rect
-                  {:class (str "timeline-rect " status-class)
-                   :x t
+                  {:class (str "timeline-rect actual " status-class)
+                   :x actual-t
                    :y (+ agent-num 0.1)
                    :width duration
                    :height 0.8}]
+                 [:rect
+                  {:class (str "timeline-rect scheduled " status-class)
+                   :x t
+                   :y (+ agent-num 0.3)
+                   :width (- actual-t t)
+                   :height 0.4}]
                  [:path {:class (str "timeline-handle " status-class)
                          :d (format "M%f %f L%f %f L%f %f z"
                                     (float (+ t duration)) (+ agent-num 0.1)

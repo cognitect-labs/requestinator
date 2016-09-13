@@ -213,6 +213,7 @@
                                      (conj index
                                            (-> val
                                                (select-keys [:t
+                                                             :actual-t
                                                              :path
                                                              :agent-id
                                                              :duration])
