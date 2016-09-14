@@ -1,6 +1,7 @@
 (ns com.cognitect.requestinator.report
   (:require [cljs.core.async :as async
              :refer [<! >! timeout]]
+            [goog.cssom :as cssom]
             [goog.dom :as gdom]
             [goog.dom.classlist :as gclasses]
             [goog.events :as gevents]
@@ -244,12 +245,40 @@
 (def t-scroll (atom 0))
 (def t-scroll-max 1000)
 
+(defn style-elem
+  "Gets or creates a style element with the specified ID."
+  [id]
+  (or (gdom/getElement id)
+      (let [e (gdom/createElement "style")]
+        (-> e .-id (set! id))
+        (-> js/document .-head (.appendChild e))
+        e)))
+
 (defn set-timeline-view
   [t-scale]
   (let [timeline (gdom/getElement "timeline")
         timeline-content (gdom/getElement "timeline-content")
         max-agent (-> timeline (.getAttribute "max-agent") js/Number.)
-        max-t (-> timeline (.getAttribute "max-t") js/Number.)]
+        max-t (-> timeline (.getAttribute "max-t") js/Number.)
+        compensator (style-elem "scale-compensator")
+        x-lod (style-elem "x-lod")]
+    (log "t-scale" t-scale)
+    (-> compensator
+        .-innerText
+        (set!
+         (gstring/format ".scale-compensation { transform: scale(%f, 0.1); }"
+                         (/ 0.1 t-scale))))
+    (-> x-lod
+        .-innerText
+        (set! (reduce str
+                      (for [t [1 5 15 30 60 300]]
+                        (str ".time"
+                             t
+                             " { "
+                             (if (< t-scale (/ 3.5 t))
+                               "display: none;"
+                               "")
+                             "}")))))
     (.setAttributeNS
      timeline-content
      nil

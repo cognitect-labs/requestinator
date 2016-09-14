@@ -110,33 +110,52 @@ body {
     fill: yellow;
 }
 
-.time {
+.time-line {
     stroke: black;
     stroke-dasharray: 0.2 0.5;
     opacity: 0.4;
     stroke-width: 0.01;
 }
 
-.time5 {
+.time-line.time5 {
     opacity: 0.6;
     stroke-dasharray: 0.2 0.5;
 }
 
-.time15 {
+.time-line.time15 {
     opacity: 0.8;
     stroke-dasharray: 0.75 0.25;
 }
 
-.time30 {
+.time-line.time30 {
     opacity: 1;
     stroke-dasharray: 0.9 0.1;
 }
 
-.time60 {
+.time-line.time60 {
     opacity: 1;
     stroke-width: 0.02;
     stroke-dasharray: 1 0;
 }
+
+.time-line.time300 {
+    opacity: 1;
+    stroke-width: 0.03;
+    stroke-dasharray: 1 0;
+}
+
+.time-line.time600 {
+    opacity: 1;
+    stroke-width: 0.04;
+    stroke-dasharray: 1 0;
+}
+
+.time-line.time900 {
+    opacity: 1;
+    stroke-width: 0.05;
+    stroke-dasharray: 1 0;
+}
+
 
 .time-label {
 }
@@ -221,3 +240,4 @@ body {
     font-size: 80%;
     color: #6f6f6f;
 }
+

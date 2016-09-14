@@ -41,8 +41,8 @@
            (merge gen/readers
                   {'requestinator.spec/swagger #(swagger/read-spec params-uri %)
                    'seconds                    identity
-                   'minutes                    #(/ % 60)
-                   'hours                      #(/ % 60 60)
+                   'minutes                    #(* % 60)
+                   'hours                      #(* % 60 60)
                    ;; For now, just read URLs as strings
                    'url                        identity})}))))
 

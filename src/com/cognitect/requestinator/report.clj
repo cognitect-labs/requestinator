@@ -16,6 +16,13 @@
           agent-id
           (long (* t 1000))))
 
+(defn time-lod
+  "Returns the level-of-detail for the specified time."
+  [t]
+  (->> [900 600 300 60 30 15 5 1]
+       (filter #(zero? (mod t %)))
+       first))
+
 (defn write-index
   "Writes the report's index.html via record-f."
   [index record-f]
@@ -31,7 +38,8 @@
        [:title "Requestinator report"]
        [:link {:href "../../css/style.css"
                :rel  "stylesheet"
-               :type "text/css"}]
+               :type "text/css"
+               :id "stylesheet"}]
        [:script {:src "../../js/report.js"
                  :type "text/javascript"}]]
       [:body
@@ -76,28 +84,26 @@
                        :height 0.99}]])
             (for [x (range 0 max-t)]
               [[:line
-                {:class (str "time time"
-                             (->> [60 30 15 5 1]
-                                  (filter #(zero? (mod x %)))
-                                  first))
+                {:class (str "time-line time" (time-lod x))
                  :x1 x
                  :x2 x
                  :y1 0
                  :y2 max-agent}]])
             [:g.time-labels
-             (let [x-scale 150
+             (let [x-scale 75
                    y-scale 10]
                (for [x (range 0 max-t)]
-                 [:text.time-label
-                  {:transform (format "translate(%d, %d) scale(%f, %f) translate(0, %d)"
-                                      x
-                                      max-agent
-                                      (/ 1.0 x-scale)
-                                      (/ 1.0 y-scale)
-                                      y-scale)
-                   :x 0.2
-                   :y 0}
-                  (format "%d:%02d" (long (/ x 60)) (mod x 60))]))]
+                 [:g {:transform (format "translate(%d, %d)"
+                                         x
+                                         max-agent)}
+                  [:g.scale-compensation
+                   [:text
+                    {:class (str "time-label time" (time-lod x))
+                     :transform (format "translate(0, %d)"
+                                        y-scale)
+                     :x 0.2
+                     :y 0}
+                    (format "%d:%02d" (long (/ x 60)) (mod x 60))]]]))]
             ;; Highlighting of selected item
             [:rect#highlight-x {:x 0 :y 0 :width max-t :height 1}]
             [:rect#highlight-y {:x 0 :y 0 :width 0 :height max-agent}]

@@ -172,7 +172,7 @@
        seq?))
 
 
-(report/write-js (ser/create-recorder "file:///tmp/requestinator/")
+(report/write-js (ser/create-recorder "file:///tmp/requestinator-test/")
                  "js")
 
 (clojure.java.shell/sh "open" "/tmp/requestinator/reports/main/html/index.html")

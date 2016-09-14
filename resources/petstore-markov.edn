@@ -4,10 +4,10 @@
   :amendments nil                       ; Optional
   }
  :requestinator/duration #minutes 1
- :requestinator/agents
- [{:requestinator.agents/count 10
-   :requestinator.agents/tag "markov"
-   :requestinator.agents/generator
+ :requestinator/agent-groups
+ [{:requestinator.agent/count 10
+   :requestinator.agent/tag "markov"
+   :requestinator.agent/generator
    #requestinator.generators/markov
    {:requests {:query-by-status {:path "/pet/findByStatus"
                                  :method "get"}
