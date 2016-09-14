@@ -35,6 +35,14 @@
        [:script {:src "../../js/report.js"
                  :type "text/javascript"}]]
       [:body
+       [:div
+        [:span.help-icon
+         {:onmouseenter "goog.style.showElement(goog.dom.getElement('instructions'), true);"
+          :onmouseleave "goog.style.showElement(goog.dom.getElement('instructions'), false);"}
+         "?"]
+        [:span#instructions
+         {:style "display: none;"}
+         "Hover over a request in the timeline to display details of the reqeust. Click it to lock. Click again to unlock it, or click another request to lock a new one. Hold down the shift key and scroll with the mouse to zoom the time dimension in and out."]]
        (let [agent-numbers (zipmap (->> index
                                         (map :agent-id)
                                         distinct
@@ -134,6 +142,9 @@
                                     (float (+ actual-t duration 0.1)) (+ agent-num 0.5)
                                     (float (+ actual-t duration)) (+ agent-num 0.9))}]]))]]])
        [:div#detail-container
+        [:div#detail-loading
+         {:style "display:none"}
+         ""]
         [:iframe#detail]]
        [:script {:type "text/javascript"}
         "com.cognitect.requestinator.report.start();"]]])))
@@ -191,12 +202,14 @@
                     "ext/js/json-formatter/bundle.js"
                     "ext/js/json-formatter/bundle.js.map"
                     "images/curl.svg"
-                    "images/clipboard.svg"]]
+                    "images/clipboard.svg"
+                    "images/spinner.gif"]]
     (->> resource
          (str "assets/")
          io/resource
-         slurp
-         .getBytes
+         io/file
+         .toPath
+         java.nio.file.Files/readAllBytes
          (record-f resource))))
 
 (defn request-line

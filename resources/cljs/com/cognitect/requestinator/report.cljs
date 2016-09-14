@@ -85,6 +85,17 @@
   (let [existing (gdom/getElement "detail")
         replacement (gdom/createElement "iframe")]
     (.setAttribute replacement "id" "detail")
+    (-> "detail-loading"
+        gdom/getElement
+        (gstyle/showElement true))
+    (gstyle/showElement replacement false)
+    (-> replacement
+        .-onload
+        (set! #(do
+                 (-> "detail-loading"
+                     gdom/getElement
+                     (gstyle/showElement false))
+                 (.play (fx/FadeInAndShow. replacement 250)))))
     (set! (.-src replacement) url)
     (gdom/replaceNode replacement existing)))
 
@@ -96,6 +107,9 @@
 (defn hide-detail
   [target]
   (log "hide")
+  (-> "detail-loading"
+      gdom/getElement
+      (gstyle/showElement false))
   (replace-detail ""))
 
 (defn show
