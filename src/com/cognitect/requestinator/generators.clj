@@ -12,11 +12,11 @@
   a map with keys ::t and ::request."))
 
 ;; Generates independent requests for all endpoints in the spec, with
-;; uniform probability.
-(defrecord UniformRequestGenerator [interarrival-sec]
+;; uniform probability and Erlang-distributed interarrival times.
+(defrecord UniformRequestGenerator [interarrival]
   RequestGenerator
   (-generate [this spec]
-    (swagger/generate spec interarrival-sec)))
+    (swagger/generate spec interarrival)))
 
 (defrecord MarkovRequestGenerator [requests graph]
   RequestGenerator

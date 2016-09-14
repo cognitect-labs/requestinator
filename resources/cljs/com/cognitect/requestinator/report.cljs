@@ -250,31 +250,44 @@
                                               (inc max-agent))]]]
       (.setAttributeNS timeline nil n v))))
 
+(defn jsx->clj
+  [x]
+  (into (sorted-map) (for [k (js/Object.keys x)] [k (aget x k)])))
+
+(defn float-scroll
+  "Enables a floating point number for scroll position by using an
+  attribute to store the value, but only if the user hasn't scrolled
+  away."
+  [e]
+  (let [aval (.getAttribute e "float-scroll")
+        sl (.-scrollLeft e)]
+    (if (nil? aval)
+      sl
+      (let [n (js/Number. aval)]
+        (if (<= (dec sl) n (inc sl))
+          n
+          sl)))))
+
 (defn mousewheel
   [e]
-  #_(log "mousewheel"
-         :offsetX (.-offsetX e)
-         :offsetY (.-offsetY e)
-         :clientX (.-clientX e)
-         :clientY (.-clientY e)
-         :screenX (.-screenX e)
-         :screenY (.-screenY e)
-         :deltaX (.-deltaX e)
-         :deltaY (.-deltaY e)
-         :keys (js/Object.keys e)
-         :shift (.-shiftKey e))
   ;; Only zoom for vertical scroll when shift is held
   ;; TODO: Figure out how to make this reasonable on a touchscreen
   (when (and (.-shiftKey e)
              (< (Math/abs (.-deltaX e)) (Math/abs (.-deltaY e))))
     (let [timeline (gdom/getElement "timeline")
+          container (gdom/getElement "timeline-container")
           old-bounds (-> timeline .getBoundingClientRect)
           old-left (.-left old-bounds)
           old-width (.-width old-bounds)
           client-x (.-clientX e)
-          old-origin (/ (- client-x old-left)
+          old-origin (/ (- client-x
+                           old-left
+                           (-> container .getBoundingClientRect .-left))
                         old-width)
-          old-body-scroll (-> js/document .-body .-scrollLeft)
+          ;; We need to scroll by smaller than one pixel sometimes,
+          ;; and we'll lose the value if we read it from .-scrollLeft
+          ;; every time.
+          old-container-scroll (float-scroll container)
           new-scroll (swap! t-scroll (fn [s]
                                        (let [d (.-deltaY e)
                                              n (+ d s)]
@@ -286,12 +299,26 @@
           new-bounds (-> timeline .getBoundingClientRect)
           new-width (.-width new-bounds)
           width-delta (- new-width old-width)
-          body-scroll-delta (* width-delta old-origin)
-          new-body-scroll (+ body-scroll-delta old-body-scroll)]
-      (log "mousewheel" :scroll new-scroll)
-      (-> js/document .-body .-scrollLeft (set! new-body-scroll))
-      (.preventDefault e)
-      (.stopPropagation e))))
+          container-scroll-delta (* width-delta old-origin)
+          new-container-scroll (+ container-scroll-delta old-container-scroll)]
+      #_(log "mousewheel"
+           :scroll new-scroll
+           :old-left old-left
+           :old-width old-width
+           :client-x client-x
+           :offset-x (.-offsetX e)
+           :old-origin old-origin
+           :old-container-scroll old-container-scroll
+           :new-scale new-scale
+           :new-width new-width
+           :width-delta width-delta
+           :container-scroll-delta container-scroll-delta
+           :new-container-scroll new-container-scroll)
+      (-> container .-scrollLeft (set! (Math/round new-container-scroll)))
+      (.setAttribute container "float-scroll" new-container-scroll)))
+  (when (.-shiftKey e)
+    (.preventDefault e)
+    (.stopPropagation e)))
 
 (defn ^:export start
   []

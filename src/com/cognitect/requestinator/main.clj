@@ -96,7 +96,7 @@
                            :validate [some? "Required"]]
                           ["-p" "--params PARAMS_LOCATION"
                            "Location of parameters file"
-                           :id :params
+                           :id :params-uri
                            :validate [some? "Required"]]]
                :impl generate}
    "execute" {:cli-spec [["-s" "--source REQUEST_SOURCE" "Path to location of requests"

@@ -95,7 +95,7 @@
             [:rect#highlight-y {:x 0 :y 0 :width 0 :height max-agent}]
             ;; The actual data points
             (for [[agent-id items] (sort-by first data)
-                  {:keys [actual-t t status path duration] :as item} (sort-by :actual-t items)
+                  {:keys [actual-t t status path duration] :as item} (sort-by (comp - :actual-t) items)
                   :let [agent-num (agent-numbers agent-id)]]
               (let [status-class (format "status%dxx" (-> status (/ 100) long))]
                 [:g
@@ -107,17 +107,32 @@
                    :y (+ agent-num 0.1)
                    :width duration
                    :height 0.8}]
+                 #_[:g {:class (str "timeline-rect scheduled " status-class)
+                        :transform (format "translate(0, %f)"
+                                           (float agent-num))}
+                    [:path {:d (format "M%f 0.02 L%f 0.4 L%f 0.6 L%f 0.98"
+                                       (float t)
+                                       (float actual-t)
+                                       (float actual-t)
+                                       (float t))}]]
                  [:rect
                   {:class (str "timeline-rect scheduled " status-class)
                    :x t
-                   :y (+ agent-num 0.3)
+                   :y (+ agent-num 0.95)
                    :width (- actual-t t)
-                   :height 0.4}]
+                   :height 0.04}]
+                 (let [width (min (- actual-t t) 0.0025)]
+                   [:rect
+                    {:class (str "timeline-rect scheduled " status-class)
+                     :x (- actual-t width)
+                     :y (+ agent-num 0.92)
+                     :width width
+                     :height 0.04}])
                  [:path {:class (str "timeline-handle " status-class)
                          :d (format "M%f %f L%f %f L%f %f z"
-                                    (float (+ t duration)) (+ agent-num 0.1)
-                                    (float (+ t duration 0.1)) (+ agent-num 0.5)
-                                    (float (+ t duration)) (+ agent-num 0.9))}]]))]]])
+                                    (float (+ actual-t duration)) (+ agent-num 0.1)
+                                    (float (+ actual-t duration 0.1)) (+ agent-num 0.5)
+                                    (float (+ actual-t duration)) (+ agent-num 0.9))}]]))]]])
        [:div#detail-container
         [:iframe#detail]]
        [:script {:type "text/javascript"}

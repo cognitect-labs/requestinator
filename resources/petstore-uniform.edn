@@ -8,4 +8,4 @@
    :requestinator.agents/tag "uniform"
    :requestinator.agents/generator
    #requestinator.generators/uniform
-   {:interarrival-sec 1}}]}
+   {:interarrival #seconds 1}}]}

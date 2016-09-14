@@ -3,6 +3,12 @@
 A Clojure library designed to generate and execute requests against a
 web service based on a [Swagger](http://swagger.io) specification.
 
+## Config File Formats
+
+There are several example files in the [resources](resources) folder.
+In particular, check out the fully-annotated
+[petstore-mixed.edn](resources/petstore-mixed.edn) example.
+
 ## Build a Docker Image
 
 Docker image names are based on the git revision. The following
@@ -26,13 +32,13 @@ twice a second for each of the three agents, and 60 seconds worth of
 data will be generated.
 
 ```
-lein run generate --spec-uri http://petstore.swagger.io/v2/swagger.json --destination file:///tmp/requestinator-test --agent-count 3 --interarrival-sec 0.5 --duration-sec 60
+lein run generate --destination file:///tmp/requestinator-test --params resources/petstore-mixed.edn
 ```
 
 ### Run Via Docker Against S3
 
 ```
-docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator generate --spec-uri http://petstore.swagger.io/v2/swagger.json --destination s3://com.cognitect.requestinator.test/readme-example --agent-count 3 --interarrival-sec 0.5 --duration-sec 60
+docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_KEY requestinator generate --destination s3://com.cognitect.requestinator.test/readme-example --params resources/petstore-mixed.edn
 ```
 
 This example assumes you have `AWS_ACCESS_KEY` and `AWS_SECRET_KEY` environment variables set to provide access to the `com.cognitect.requestinator.test` bucket.
@@ -60,6 +66,12 @@ lein run report --source file:///tmp/requestinator-test/results --destination fi
 ```
 
 Open `/tmp/requestinator-test/reports/main/html/index.html` to view.
+There is one row for each agent, in which triangles represent
+requests, positioned horizontally according to the time they were
+executed. The length of the solid rectangle indicates the duration.
+Hover over a request to see its details in the lower pane. Click one
+to "lock" it. Hold shift and scroll to zoom the time dimension in and
+out.
 
 ## Architecture
 
