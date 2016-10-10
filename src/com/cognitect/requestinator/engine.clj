@@ -3,6 +3,7 @@
   into a working system."
   (:require [com.cognitect.requestinator.json :as json-helper]
             [com.cognitect.requestinator.generators :as gen]
+            [com.cognitect.requestinator.http :as http]
             [com.cognitect.requestinator.report :as report]
             [com.cognitect.requestinator.serialization :as ser]
             [com.cognitect.requestinator.sexp :as sexp]
@@ -13,8 +14,7 @@
             [requestinator.agent :as agent]
             [clojure.core.async :as async :refer [>!! <!!]]
             [clojure.data.json :as json]
-            [clojure.tools.logging :as log]
-            [simulant.http :as http])
+            [clojure.tools.logging :as log])
   (:import [java.io
             ByteArrayInputStream
             ByteArrayOutputStream

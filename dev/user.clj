@@ -14,13 +14,13 @@
             [com.cognitect.requestinator.generators.markov :as markov]
             [com.cognitect.requestinator.json :as json-helper]
             [com.cognitect.requestinator.html :as h]
+            [com.cognitect.requestinator.http :as http]
             [com.cognitect.requestinator.main :as main]
             [com.cognitect.requestinator.report :as report]
             [com.cognitect.requestinator.s3 :as s3]
             [com.cognitect.requestinator.serialization :as ser]
             [com.cognitect.requestinator.swagger :as swagger]
-            [com.gfredericks.test.chuck.generators :as chuck-gen]
-            [simulant.http :as http]))
+            [com.gfredericks.test.chuck.generators :as chuck-gen]))
 
 (defn run-tests
   []
