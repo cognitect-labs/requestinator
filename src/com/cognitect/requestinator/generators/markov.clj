@@ -5,7 +5,7 @@
             [clojure.test.check.generators :as tcgen]
             [clojure.tools.logging :as log]
             [com.cognitect.requestinator.math :as math]
-            [com.cognitect.requestinator.swagger :as swagger]))
+            [com.cognitect.requestinator.spec :as spec]))
 
 (defn produce-request
   "Takes the intermediate state of the request-producing process and
@@ -24,9 +24,7 @@
   ;; from them as we hit each one
   (let [request-seqs (->> requests
                           (map (fn [[state params]]
-                                 [state (tcgen/sample-seq (swagger/request-generator
-                                                           spec
-                                                           params))]))
+                                 [state (spec/requests spec params)]))
                           (into {}))]
     (->>  (es/event-stream {:graph graph
                             :delay-ops {'constant (fn [rtime t] t)

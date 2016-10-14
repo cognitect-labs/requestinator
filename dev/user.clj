@@ -28,8 +28,9 @@
                           'com.cognitect.requestinator.json-test))
 
 (defn repl-server
-  [port]
-  (repl-server/start-server {:port port
-                             :name "requestinator"
-                             :accept 'clojure.core.server/repl
-                             :daemon false}))
+  ([] (repl-server 5560))
+  ([port]
+   (repl-server/start-server {:port port
+                              :name "requestinator"
+                              :accept 'clojure.core.server/repl
+                              :daemon false})))

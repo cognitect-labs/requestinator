@@ -7,10 +7,9 @@
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.tools.logging :as log]
             [com.cognitect.requestinator.engine :as engine]
-            [com.cognitect.requestinator.generators :as gen]
             [com.cognitect.requestinator.report :as report]
-            [com.cognitect.requestinator.serialization :as ser]
-            [com.cognitect.requestinator.swagger :as swagger]))
+            [com.cognitect.requestinator.readers :as readers]
+            [com.cognitect.requestinator.serialization :as ser]))
 
 (defn exit [status msg]
   (println msg)
@@ -38,13 +37,11 @@
          String.
          (edn/read-string
           {:readers
-           (merge gen/readers
-                  {'requestinator.spec/swagger #(swagger/read-spec params-uri %)
-                   'seconds                    identity
+           (merge (readers/spec-readers params-uri)
+                  readers/generator-readers
+                  {'seconds                    identity
                    'minutes                    #(* % 60)
-                   'hours                      #(* % 60 60)
-                   ;; For now, just read URLs as strings
-                   'url                        identity})}))))
+                   'hours                      #(* % 60 60)})}))))
 
 (defn generate
   [{:keys [destination

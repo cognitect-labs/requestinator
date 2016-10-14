@@ -4,8 +4,8 @@
   (:require [clojure.edn :as edn]
             [clojure.tools.logging :as log]
             [com.cognitect.requestinator.generators.markov :as markov]
-            [com.cognitect.requestinator.serialization :as ser]
-            [com.cognitect.requestinator.swagger :as swagger]))
+            [com.cognitect.requestinator.math :as math]
+            [com.cognitect.requestinator.spec :as spec]))
 
 (defprotocol RequestGenerator
   (-generate [this spec] "Returns a lazy sequence of request descriptions,
@@ -16,16 +16,17 @@
 (defrecord UniformRequestGenerator [interarrival]
   RequestGenerator
   (-generate [this spec]
-    (swagger/generate spec interarrival)))
+    (map (fn [t request]
+           {::t t
+            ::request request})
+         (reductions + (repeatedly #(math/erlang interarrival)))
+         ;; TODO: Support parameters at some point
+         (spec/requests spec {}))))
 
 (defrecord MarkovRequestGenerator [requests graph]
   RequestGenerator
   (-generate [this spec]
     (markov/generate spec requests graph)))
-
-(def readers
-  {'requestinator.generators/markov map->MarkovRequestGenerator
-   'requestinator.generators/uniform map->UniformRequestGenerator})
 
 ;; We consolidate calls to generators through this function so that we
 ;; have a central place to add things like logging.
@@ -36,12 +37,4 @@
   [generator spec]
   (-generate generator spec))
 
-(defn read-generator
-  "Return a generator instance given a URI."
-  [uri additional-readers]
-  (log/debug "read-generator" :uri uri :additional-readers additional-readers)
-  (let [fetcher (ser/create-fetcher uri)]
-    (->> (fetcher "")
-         String.
-         (edn/read-string
-          {:readers (merge additional-readers readers)}))))
+

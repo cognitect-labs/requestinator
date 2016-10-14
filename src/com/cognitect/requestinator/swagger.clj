@@ -10,6 +10,7 @@
             [com.cognitect.requestinator.math :as math]
             [com.cognitect.requestinator.serialization :as ser]
             [com.cognitect.requestinator.sexp :as sexp]
+            [com.cognitect.requestinator.spec :as spec]
             [com.gfredericks.test.chuck.generators :as chuck-gen])
   (:import [java.util Base64]
            [java.net URLEncoder]))
@@ -266,13 +267,13 @@
   ;; number of Swagger specs I tried, 30 seems to do a decent job of
   ;; generating "interesting" requests often enough. But we probably
   ;; need to expose `max-size` from the command line eventually.
-  ([spec interarrival-sec] (generate spec interarrival-sec 30))
-  ([spec interarrival-sec max-size]
-   (map (fn [t request]
-          {:com.cognitect.requestinator.generators/t t
-           :com.cognitect.requestinator.generators/request request})
-        (reductions + (repeatedly #(math/erlang interarrival-sec)))
-        (gen/sample-seq (request-generator spec) max-size))))
+  ([spec params] (generate spec params 30))
+  ([spec params max-size]
+   (gen/sample-seq (request-generator spec params) max-size)))
+
+(defrecord Spec [spec]
+  spec/Spec
+  (-requests [this params] (generate spec params)))
 
 ;; TODO: Update this code so that the spec and amendments can be
 ;; embedded literally in the spec file rather than us assuming they're
@@ -288,12 +289,7 @@
                             (ser/resolve-relative base-uri)
                             slurp
                             json/read-str)]
-    (json-helper/amend spec amendments)))
+    (->Spec (json-helper/amend spec amendments))))
 
-(defn readers
-  [base-uri]
-  {'requestinator.spec/swagger #(read-spec base-uri %)
-   ;; For now, read URLs as strings, since we're not set up to include
-   ;; specs as literals.
-   'url identity})
+
 
