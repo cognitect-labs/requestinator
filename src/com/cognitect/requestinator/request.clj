@@ -32,5 +32,4 @@
   [template params]
   (-fill-in template params))
 
-(defmulti dynamic-param-op (fn [op context & args] op))
 

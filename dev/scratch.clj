@@ -140,7 +140,7 @@
      dorun)
 
 (main/generate {:destination "file:///tmp/requestinator/"
-                :params-uri "resources/petstore-mixed.edn"}
+                :params-uri "/tmp/test-markov.edn" #_"resources/petstore-mixed.edn"}
                [])
 
 (pprint (main/read-params  "resources/petstore-mixed.edn"))

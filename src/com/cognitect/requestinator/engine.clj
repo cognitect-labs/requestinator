@@ -1,7 +1,8 @@
 (ns com.cognitect.requestinator.engine
   "A library to pull together the various pieces of the Requestinator
   into a working system."
-  (:require [com.cognitect.requestinator.json :as json-helper]
+  (:require [cognitect.transit :as transit]
+            [com.cognitect.requestinator.json :as json-helper]
             [com.cognitect.requestinator.http :as http]
             [com.cognitect.requestinator.report :as report]
             [com.cognitect.requestinator.request :as request]
@@ -22,6 +23,49 @@
             InputStream]
            [java.nio.file CopyOption Files]))
 
+;;; Parameter evaluation
+
+(defprotocol Evaluable
+  (-evaluate [this context]
+    "Evaluates something in a given context"))
+
+(defrecord Recall [val default]
+  Evaluable
+  (-evaluate [this context]
+    (log/debug "recalling" :val val :default default)
+    (get context val default)))
+
+(defn make-recall
+  "Creates a new recall, an object that can recall a previously-stored
+  value from agent memory."
+  [[val default]]
+  (->Recall val default))
+
+;; We consolidate calls to the protocol through this function so we have
+;; a common place to put logging or other cross-cutting concerns.
+(defn evaluate
+  "Evaluate a value in a given context. Prefer this function to the
+  -evaluate protocol function."
+  [val context]
+  ;; I could extend the protocol to Object, but I find this approach
+  ;; simpler. We already have this function for good reasons - why not
+  ;; make things explicit?
+  (log/debug "evaluate" :val val :context context)
+  (if (satisfies? Evaluable val)
+    (-evaluate val context)
+    val))
+
+(defmethod ser/transit-read-handlers :engine
+  [_]
+  {(.getName Recall) (transit/record-read-handler Recall)})
+
+(defmethod ser/transit-write-handlers :engine
+  [_]
+  {Recall (transit/record-write-handler Recall)})
+
+(defmethod ser/edn-readers :engine
+  [_ relative-to]
+  {'requestinator/recall make-recall})
 
 ;;; Generation
 
@@ -116,7 +160,11 @@
     (.start worker)
     {::worker worker}))
 
-(defmulti storage-op (fn [op op-context & args] op))
+(defmulti storage-op
+  "A storage operation, like `response-body-json` that can be used to
+  retrieve values from a response for storage in agent memory. If the
+  operation returns nil, nothing is stored."
+  (fn [op op-context & args] op))
 
 (defmethod storage-op 'response-body-json
   [op {:keys [response]} path]
@@ -130,20 +178,13 @@
   [{:keys [agent-memory request-template request response] :as context}]
   (let [{:keys [store]} request-template]
     (into {}
-          (for [[k v] store]
-            [k (sexp/eval v
+          (for [[k v] store
+                :let [e (sexp/eval v
                           #(get context %)
                           (fn [op args]
-                            (apply storage-op op context args)))]))))
-
-(defmethod request/dynamic-param-op 'recall
-  [op context k default]
-  (log/debug "recall" :op op :context context :k k :default default)
-  ;; TODO: Is this really what we want? Unfortunately we don't have a
-  ;; way at the moment to distinguish between someone intentionally
-  ;; storing nil and someone storing nil because a parameter wasn't
-  ;; present or something.
-  (or (get context k) default))
+                            (apply storage-op op context args)))]
+                :when (some? e)]
+            [k e]))))
 
 (defn create-agent
   "Returns a running agent that will consume request info maps from

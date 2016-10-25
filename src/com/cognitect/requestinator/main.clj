@@ -34,8 +34,17 @@
   (str "The following errors occurred while parsing your command:\n\n"
        (str/join \newline errors)))
 
-(def spec-types [:swagger :graphql])
-(def scheduler-types [:uniform :markov])
+(def transit-serialization-types
+  [:swagger
+   :graphql
+   :engine])
+
+(def edn-serialization-types
+  [:swagger
+   :graphql
+   :engine
+   :uniform
+   :markov])
 
 (defn read-params
   [params-uri]
@@ -47,7 +56,7 @@
            ;; TODO: Change this from passing params-uri to passing the
            ;; fetcher, once the fetcher can deal with absolute URIs as
            ;; a parameter.
-           (->> (into spec-types scheduler-types)
+           (->> edn-serialization-types
                 (map #(ser/edn-readers % params-uri))
                 (reduce merge)
                 (merge {'seconds identity
@@ -66,7 +75,7 @@
     (engine/generate-activity-streams
      (assoc params
             :recorder recorder
-            :write-handlers (->> spec-types
+            :write-handlers (->> transit-serialization-types
                                  (map ser/transit-write-handlers)
                                  (reduce merge)))))
   {:code    0
@@ -86,7 +95,7 @@
                                           :start                (java.util.Date. (+ (System/currentTimeMillis)
                                                                                     10000))
                                           :recorder-concurrency recorder-concurrency
-                                          :read-handlers (->> spec-types
+                                          :read-handlers (->> transit-serialization-types
                                                               (map ser/transit-read-handlers)
                                                               (reduce merge))})]
     (loop []

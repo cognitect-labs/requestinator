@@ -7,10 +7,10 @@
             [clojure.test.check.generators :as gen]
             [clojure.tools.logging :as log]
             [cognitect.transit :as transit]
+            [com.cognitect.requestinator.engine :as engine]
             [com.cognitect.requestinator.json :as json-helper]
             [com.cognitect.requestinator.math :as math]
             [com.cognitect.requestinator.serialization :as ser]
-            [com.cognitect.requestinator.sexp :as sexp]
             [com.cognitect.requestinator.request :as request]
             [com.gfredericks.test.chuck.generators :as chuck-gen])
   (:import [java.util Base64]
@@ -171,26 +171,16 @@
          multipart-boundary
          "--")))
 
-(defn resolve-dynamic-params
-  [context params]
+(defn evaluate-params
+  [params context]
   (map (fn [param]
-         (update param
-                 :value
-                 (fn [expr]
-                   (sexp/eval expr
-                              ;; TODO: It might make sense to resolve
-                              ;; symbols to stored values at some
-                              ;; point
-                              (fn [_] (throw (ex-data "Symbols have no value in this context"
-                                                      {:reason ::cannot-resolve-symbol
-                                                       :expr expr})))
-                              (fn [op args]
-                                (apply request/dynamic-param-op op context args))))))
+         (update param :value #(engine/evaluate % context)))
        params))
 
 (defn request
   [{:keys [host scheme base-path op method params mime-type]} context]
-  (let [params (resolve-dynamic-params context params)
+  (let [params (evaluate-params params context)
+        _ (log/debug "request" :params params)
         {:strs [query header path formData body]} (group-by #(get % "in") params)]
     {:url          (format "%s://%s%s%s"
                            scheme
@@ -220,7 +210,12 @@
                                json/write-str)
                      formData (format-form-data mime-type formData))}))
 
-(defn override-params
+(defrecord Template [host scheme base-path op method mime-type params store]
+  request/Template
+  (-fill-in [this context]
+    (request this context)))
+
+(defn override-param-values
   "Updates `base`, a sequence of parameter maps, with values
   overridden per `overrides`."
   [base overrides]
@@ -231,11 +226,6 @@
               (assoc param :value o)
               param)))
         base))
-
-(defrecord Template [host scheme base-path op method mime-type params store]
-  request/Template
-  (-fill-in [this context]
-    (request this context)))
 
 (defn request-generator
   "Given a Swagger spec, return a generator that will create a random
@@ -261,7 +251,7 @@
          :op        op
          :method    method
          :mime-type mime-type
-         :params    (override-params params param-overrides)
+         :params    (override-param-values params param-overrides)
          :store     store})))))
 
 (defn generate

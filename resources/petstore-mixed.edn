@@ -94,9 +94,9 @@
                :pet-by-id       {:path   "/pet/{petId}"
                                  :method "get"
                                  ;; Parameters can be overridden by
-                                 ;; previous-stored value via the
-                                 ;; `recall` operation, which takes a
-                                 ;; key and a default value to use if
-                                 ;; no value has yet been stored.
-                                 :param-overrides {"petId" (recall "pet-id" 42)}}}}}]}
+                                 ;; previous-stored value via a
+                                 ;; `recall`, which takes a key and
+                                 ;; a default value to use if no
+                                 ;; value has yet been stored.
+                                 :param-overrides {"petId" #requestinator/recall ["pet-id" 42]}}}}}]}
 
