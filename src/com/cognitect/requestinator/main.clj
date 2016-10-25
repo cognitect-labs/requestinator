@@ -8,8 +8,12 @@
             [clojure.tools.logging :as log]
             [com.cognitect.requestinator.engine :as engine]
             [com.cognitect.requestinator.report :as report]
-            [com.cognitect.requestinator.readers :as readers]
-            [com.cognitect.requestinator.serialization :as ser]))
+            [com.cognitect.requestinator.serialization :as ser]
+            ;; We need these to be loaded for their read/write support
+            [com.cognitect.requestinator.swagger]
+            [com.cognitect.requestinator.graphql]
+            [com.cognitect.requestinator.schedulers.markov]
+            [com.cognitect.requestinator.schedulers.uniform]))
 
 (defn exit [status msg]
   (println msg)
@@ -30,6 +34,9 @@
   (str "The following errors occurred while parsing your command:\n\n"
        (str/join \newline errors)))
 
+(def spec-types [:swagger :graphql])
+(def scheduler-types [:uniform :markov])
+
 (defn read-params
   [params-uri]
   (let [fetcher (ser/create-fetcher params-uri)]
@@ -37,11 +44,16 @@
          String.
          (edn/read-string
           {:readers
-           (merge (readers/spec-readers params-uri)
-                  readers/generator-readers
-                  {'seconds                    identity
-                   'minutes                    #(* % 60)
-                   'hours                      #(* % 60 60)})}))))
+           ;; TODO: Change this from passing params-uri to passing the
+           ;; fetcher, once the fetcher can deal with absolute URIs as
+           ;; a parameter.
+           (->> (into spec-types scheduler-types)
+                (map #(ser/edn-readers % params-uri))
+                (reduce merge)
+                (merge {'seconds identity
+                        'minutes #(* % 60)
+                        'hours   #(* % 60 60)
+                        'url     identity}))}))))
 
 (defn generate
   [{:keys [destination
@@ -51,7 +63,12 @@
   (log/debug "Generate" :options options)
   (let [recorder (ser/create-recorder destination)
         params (read-params params-uri)]
-    (engine/generate-activity-streams (assoc params :recorder recorder)))
+    (engine/generate-activity-streams
+     (assoc params
+            :recorder recorder
+            :write-handlers (->> spec-types
+                                 (map ser/transit-write-handlers)
+                                 (reduce merge)))))
   {:code    0
    :message "Success"})
 
@@ -68,7 +85,10 @@
                                           ;; just go with "10 seconds from now"
                                           :start                (java.util.Date. (+ (System/currentTimeMillis)
                                                                                     10000))
-                                          :recorder-concurrency recorder-concurrency})]
+                                          :recorder-concurrency recorder-concurrency
+                                          :read-handlers (->> spec-types
+                                                              (map ser/transit-read-handlers)
+                                                              (reduce merge))})]
     (loop []
       (when-let [msg (<!! status)]
         (println msg)

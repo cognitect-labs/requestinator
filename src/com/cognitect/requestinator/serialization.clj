@@ -76,18 +76,22 @@
         ([thing off len] (.write inner thing off len))))))
 
 (defn encode
-  "Serializes `val` to a byte array."
-  [val]
-  (let [out    (ByteArrayOutputStream.)
-        writer (transit/writer out :json)]
-    (transit/write writer val)
-    (.toByteArray out)))
+  "Serializes `val` to a byte array. Optional `opts` are Transit
+  writer options."
+  ([val] (encode val {}))
+  ([val opts]
+   (let [out    (ByteArrayOutputStream.)
+         writer (transit/writer out :json opts)]
+     (transit/write writer val)
+     (.toByteArray out))))
 
 (defn decode
-  "Deserializes `val` from a byte array."
-  [^bytes in]
-  (let [reader (transit/reader (ByteArrayInputStream. in) :json)]
-    (transit/read reader)))
+  "Deserializes `val` from a byte array. If provided, `opts` specifies
+  Transit reader options."
+  ([^bytes in] (decode in {}))
+  ([^bytes in opts]
+   (let [reader (transit/reader (ByteArrayInputStream. in) :json opts)]
+     (transit/read reader))))
 
 (defn parse-uri
   [uri]
@@ -134,4 +138,19 @@
       :file (file-fetcher dir)
       :s3 (s3-fetcher (s3/client) bucket prefix))))
 
+(defmulti transit-read-handlers
+  "Returns a map of types to Transit read handlers that support the given format"
+  (fn [format] format))
 
+(defmulti transit-write-handlers
+  "Returns a map of types to Transit write handlers that support the given format"
+  (fn [format] format))
+
+(defmulti edn-readers
+  "Returns a map of symbols to functions to support reading custom
+  tags in an EDN file. `format` indicates the particular read
+  context (Swagger, GraphQL, etc.) and `relative-to` is the path from
+  which the data is being read, to assist in resolving references."
+  ;; TODO: this approach for relative-to sort of sucks because it
+  ;; doesn't nest arbitrarily deep.
+  (fn [format relative-to] format))

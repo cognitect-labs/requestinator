@@ -2,12 +2,12 @@
   "A library to pull together the various pieces of the Requestinator
   into a working system."
   (:require [com.cognitect.requestinator.json :as json-helper]
-            [com.cognitect.requestinator.generators :as gen]
             [com.cognitect.requestinator.http :as http]
             [com.cognitect.requestinator.report :as report]
+            [com.cognitect.requestinator.request :as request]
+            [com.cognitect.requestinator.scheduler :as schedule]
             [com.cognitect.requestinator.serialization :as ser]
             [com.cognitect.requestinator.sexp :as sexp]
-            [com.cognitect.requestinator.swagger :as swagger]
             [com.cognitect.requestinator.thread-pool :as thread-pool]
             [com.stuartsierra.component :as component]
             [requestinator :as r]
@@ -28,27 +28,28 @@
 (defn generate-activity-streams
   "Generates timestamped requests to a web service via `generator`, an
   instance of
-  `com.cognitect.requestinator.generators.RequestGenerator` and
+  `com.cognitect.requestinator.request.RequestGenerator` and
   records them using `recorder`. Does not actually issue the requests
   to produce responses."
-  [{:keys [::r/spec ::r/duration ::r/agent-groups :recorder]
+  [{:keys [::r/spec ::r/duration ::r/agent-groups recorder write-handlers]
     :as opts}]
-  (->> (for [{:keys [::agent/count ::agent/tag ::agent/generator]} agent-groups
+  (->> (for [{:keys [::agent/count ::agent/tag ::agent/scheduler]} agent-groups
              agent-num (range count)
              :let [agent-id (format "%s-%04d" tag agent-num)]]
-         (loop [[{:keys [::gen/t ::gen/request]} & more] (gen/generate generator spec)
-                agent-info            {}]
-           (if (or (nil? request) (< duration t))
-             [agent-id agent-info]
-             (let [path (format "%s/%010d.transit"
-                                agent-id
-                                (long (* t 1000)))]
-               (recorder path
-                         (ser/encode request))
-               (recur more
-                      (assoc-in agent-info
-                                [:requests t]
-                                path))))))
+         (loop [schedule   (schedule/schedule scheduler spec)
+                agent-info {}]
+           (let [[{:keys [::schedule/t ::schedule/request]} & more] schedule]
+             (if (or (nil? request) (< duration t))
+               [agent-id agent-info]
+               (let [path (format "%s/%010d.transit"
+                                  agent-id
+                                  (long (* t 1000)))]
+                 (recorder path
+                           (ser/encode request {:handlers write-handlers}))
+                 (recur more
+                        (assoc-in agent-info
+                                  [:requests t]
+                                  path)))))))
        (into (sorted-map))
        ser/encode
        (recorder "index.transit")))
@@ -72,14 +73,17 @@
   "Returns a running fetcher that will get objects described by
   `request-infos` and place them on `output-chan`. `request-infos` is
   a sequence of maps containing key `path`."
-  [request-infos output-chan fetch-f]
+  [request-infos output-chan fetch-f read-handlers]
+  (log/debug "create-fetcher" :read-handlers read-handlers)
   (let [worker (Thread.
                 (fn []
                   (try
                     (doseq [{:keys [path] :as request-info} request-infos]
                       (log/debug "Fetching" :path path)
-                      (async/>!! output-chan (assoc request-info
-                                                    :request (ser/decode (fetch-f path)))))
+                      (async/>!! output-chan
+                                 (assoc request-info
+                                        :request (ser/decode (fetch-f path)
+                                                             {:handlers read-handlers}))))
                     (catch Throwable t
                       (log/error t "Error in fetcher"))
                     (finally
@@ -132,7 +136,7 @@
                           (fn [op args]
                             (apply storage-op op context args)))]))))
 
-(defmethod swagger/dynamic-param-op 'recall
+(defmethod request/dynamic-param-op 'recall
   [op context k default]
   (log/debug "recall" :op op :context context :k k :default default)
   ;; TODO: Is this really what we want? Unfortunately we don't have a
@@ -156,7 +160,7 @@
                       (when-let [{:keys [request] :as request-info} (<!! input-chan)]
                         (log/debug "Agent requesting" :path (:path request-info))
                         (let [request-template request
-                              request (swagger/request request-template agent-memory)
+                              request (request/fill-in request-template agent-memory)
                               actual-t (elapsed start)
                               begin (System/currentTimeMillis)
                               response (client request)
@@ -252,8 +256,8 @@
     {::worker worker}))
 
 (defn execute
-  [{:keys [fetch-f record-f start recorder-concurrency]}]
-  (let [index       (ser/decode (fetch-f "index.transit"))
+  [{:keys [fetch-f record-f start recorder-concurrency read-handlers]}]
+  (let [index       (ser/decode (fetch-f "index.transit") {:handlers read-handlers})
         agent-count (count index)
         processes   (for [[agent-id agent-info] index]
                       (let [request-infos (sort-by :t
@@ -268,7 +272,10 @@
                          :->throttler ->throttler
                          :->agent     ->agent
                          :->recorder  ->recorder
-                         :fetcher     (create-fetcher  request-infos ->throttler fetch-f)
+                         :fetcher     (create-fetcher request-infos
+                                                      ->throttler
+                                                      fetch-f
+                                                      read-handlers)
                          :throttler   (create-throttler start ->throttler ->agent)
                          :agent       (create-agent start ->agent ->recorder)}))
         ->recorders  (map :->recorder processes)

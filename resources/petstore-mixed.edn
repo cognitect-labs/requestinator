@@ -31,21 +31,21 @@
    ;; of the path to the various files related to the agent in the
    ;; underlying storage.
    :requestinator.agent/tag "uniform"
-   ;; Generators implement RequestGenerator and are responsible for
+   ;; Schedulers implement RequestScheduler and are responsible for
    ;; creating a timestamped sequence of requests based on some model.
    ;; Currently, only uniform (randomly create requests against all of
-   ;; the endpoints in the Swagger doc) and markov generators (see
+   ;; the endpoints in the Swagger doc) and markov schedulers (see
    ;; below) are implemented.
-   :requestinator.agent/generator
-   #requestinator.generators/uniform
+   :requestinator.agent/scheduler
+   #requestinator.scheduler/uniform
    {;; Generate requests with an Erlang-distributed interarrival time,
     ;; with a mean of 1 second
     :interarrival #seconds 1}}
   {:requestinator.agent/count 5
    :requestinator.agent/tag "markov"
-   :requestinator.agent/generator
-   #requestinator.generators/markov
-   ;; The Markov generator uses
+   :requestinator.agent/scheduler
+   #requestinator.scheduler/markov
+   ;; The Markov scheduler uses
    ;; causatum (https://github.com/candera/causatum) to generate
    ;; requests from a first-order Markov model of agent behavior.
    { ;; The graph describes the sequence of states the agents will move

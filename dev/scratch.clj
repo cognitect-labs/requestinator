@@ -177,3 +177,66 @@
 
 (clojure.java.shell/sh "open" "/tmp/requestinator/reports/main/html/index.html")
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def s (graphql/read-spec {:url "https://graphql-swapi.parseapp.com/?"}))
+
+
+(->> 'com.cognitect.requestinator.main
+     find-ns
+     #_ns-aliases
+     ns-refers
+     vals
+     (map #(.-ns %))
+     (into #{}))
+
+
+(swagger/map->AbstractRequest )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(as-> (swagger/read-spec "" {:base "http://petstore.swagger.io/v2/swagger.json"}) ?
+  (:spec ?)
+  (swagger/request-generator ? {:path "/pet/findByStatus"
+                                :param-overrides {"status" ["available"]}})
+  (tcgen/sample-seq ?)
+  (drop 10 ?)
+  (take 10 ?)
+  (pprint ?))
+
+(get-in (swagger/read-spec "" {:base "http://petstore.swagger.io/v2/swagger.json"})
+        ["paths" "/pet/findByStatus"])
+
+(pprint (swagger/read-spec "" {:base "http://petstore.swagger.io/v2/swagger.json"}))
+
+(ser/)
+
+(def v (let [dir "/tmp/requestinator/markov-0000/"
+             fetch-f (ser/file-fetcher dir)]
+         (->  "0000001000.transit"
+              fetch-f
+              ser/decode)))
+
+(let [fetcher (ser/create-fetcher
+               "file://tmp/requestinator")]
+  (-> "markov-0000/0000002000.transit"
+      fetcher
+      (ser/decode {:handlers (->> main/spec-types
+                                  (map ser/transit-read-handlers)
+                                  (reduce merge))})))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defprotocol Evaluates
+  (-eval [this context]))
+
+(extend-protocol Evaluates
+  Object
+  (-eval [this context] this))
+
+(defrecord Recall [nm default]
+  (-eval [this context] (get context nm default)))
+
+(defn -fill-in [template context]
+  (let [params (map #(-eval % context) (:params template))])
+  )

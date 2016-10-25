@@ -1,16 +1,36 @@
 (ns com.cognitect.requestinator.spec
-  "A library for reading and parsing specifications, and generating
-  random request maps from them.")
+  "A library that defines a set of operations for mapping specs to
+  requests. This happens in two steps. First, a spec is used to
+  generate a sequence of `request template`, an abstract description
+  of a request to be executed. Abstract, because it may contain
+  placeholders that need to be filled in at runtime, for instance
+  based on the results of previous requests. At runtime, request
+  templates are built into actual requests.")
 
-(defprotocol Spec
-  (-requests [this params]
-    "Return a lazy sequence of request maps."))
+(defprotocol RequestTemplateBuilder
+  (-request-templates [this params]
+    "Return a lazy sequence of request templates."))
 
-;; We consolidate calls through this function so that we
+(defprotocol RequestBuilder
+  (-build [template params]
+    "Fills in the 'holes' in a request template to produce an
+    actionable request map."))
+
+;; We consolidate calls through these functions so that we
 ;; have a central place to add things like logging.
-(defn requests
+(defn request-templates
   "Generate a lazy sequence of request maps. Call this in preference
-  to the -generate protocol method."
+  to the protocol method."
   [spec params]
-  (-requests spec params))
+  (-request-templates spec params))
+
+(defn build
+  "Convert a request template into a request based on the information
+  in the `state` map. Call this in preference to the protocol method"
+  [template state]
+  (-build template state))
+
+(defmulti dynamic-param-op (fn [op context & args] op))
+
+
 

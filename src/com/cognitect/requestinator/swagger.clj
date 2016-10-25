@@ -6,11 +6,12 @@
             [clojure.test.check :as c]
             [clojure.test.check.generators :as gen]
             [clojure.tools.logging :as log]
+            [cognitect.transit :as transit]
             [com.cognitect.requestinator.json :as json-helper]
             [com.cognitect.requestinator.math :as math]
             [com.cognitect.requestinator.serialization :as ser]
             [com.cognitect.requestinator.sexp :as sexp]
-            [com.cognitect.requestinator.spec :as spec]
+            [com.cognitect.requestinator.request :as request]
             [com.gfredericks.test.chuck.generators :as chuck-gen])
   (:import [java.util Base64]
            [java.net URLEncoder]))
@@ -170,8 +171,6 @@
          multipart-boundary
          "--")))
 
-(defmulti dynamic-param-op (fn [op context & args] op))
-
 (defn resolve-dynamic-params
   [context params]
   (map (fn [param]
@@ -186,7 +185,7 @@
                                                       {:reason ::cannot-resolve-symbol
                                                        :expr expr})))
                               (fn [op args]
-                                (apply dynamic-param-op op context args))))))
+                                (apply request/dynamic-param-op op context args))))))
        params))
 
 (defn request
@@ -233,6 +232,11 @@
               param)))
         base))
 
+(defrecord Template [host scheme base-path op method mime-type params store]
+  request/Template
+  (-fill-in [this context]
+    (request this context)))
+
 (defn request-generator
   "Given a Swagger spec, return a generator that will create a random
   request map against one of the operations in it."
@@ -250,14 +254,15 @@
                scheme                      (gen/elements schemes)
                params                      (params-generator spec
                                                              (get method-description "parameters"))]
-       {:host      host
-        :scheme    scheme
-        :base-path basePath
-        :op        op
-        :method    method
-        :mime-type mime-type
-        :params    (override-params params param-overrides)
-        :store     store}))))
+       (map->Template
+        {:host      host
+         :scheme    scheme
+         :base-path basePath
+         :op        op
+         :method    method
+         :mime-type mime-type
+         :params    (override-params params param-overrides)
+         :store     store})))))
 
 (defn generate
   "Given a Swagger spec, return a lazy sequence of Ring request maps
@@ -271,9 +276,9 @@
   ([spec params max-size]
    (gen/sample-seq (request-generator spec params) max-size)))
 
-(defrecord Spec [spec]
-  spec/Spec
-  (-requests [this params] (generate spec params)))
+(defrecord Generator [spec]
+  request/Generator
+  (-generate [this params] (generate spec params)))
 
 ;; TODO: Update this code so that the spec and amendments can be
 ;; embedded literally in the spec file rather than us assuming they're
@@ -289,7 +294,16 @@
                             (ser/resolve-relative base-uri)
                             slurp
                             json/read-str)]
-    (->Spec (json-helper/amend spec amendments))))
+    (->Generator (json-helper/amend spec amendments))))
 
+(defmethod ser/transit-read-handlers :swagger
+  [_]
+  {(.getName Template) (transit/record-read-handler Template)})
 
+(defmethod ser/transit-write-handlers :swagger
+  [_]
+  {Template (transit/record-write-handler Template)})
 
+(defmethod ser/edn-readers :swagger
+  [_ relative-to]
+  {'requestinator.spec/swagger #(read-spec relative-to %)})
