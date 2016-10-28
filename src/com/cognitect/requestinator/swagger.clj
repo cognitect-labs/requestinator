@@ -210,7 +210,7 @@
                                json/write-str)
                      formData (format-form-data mime-type formData))}))
 
-(defrecord Template [host scheme base-path op method mime-type params store]
+(defrecord Template [host scheme base-path op method mime-type params]
   request/Template
   (-fill-in [this context]
     (request this context)))
@@ -232,7 +232,7 @@
   request map against one of the operations in it."
   ([spec] (request-generator spec {}))
   ([spec params]
-   (let [{:keys [path method param-overrides store]} params
+   (let [{:keys [path method param-overrides]} params
          {:strs [host basePath schemes definitions paths]} spec]
      (gen/let [[op op-description]         (if path
                                              (gen/return [path (get paths path)])
@@ -251,8 +251,7 @@
          :op        op
          :method    method
          :mime-type mime-type
-         :params    (override-param-values params param-overrides)
-         :store     store})))))
+         :params    (override-param-values params param-overrides)})))))
 
 (defn generate
   "Given a Swagger spec, return a lazy sequence of Ring request maps

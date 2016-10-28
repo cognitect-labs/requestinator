@@ -12,19 +12,21 @@
 (defn produce-request
   "Takes the intermediate state of the request-producing process and
   the next state, and returns the next intermediate state."
-  [{:keys [::request-seqs] :as s} {:keys [state rtime]}]
+  [{:keys [::request-seqs request-params] :as s} {:keys [state rtime]}]
   (let [[request & more] (get request-seqs state)]
     (-> s
-        (assoc ::request request
-               ::t rtime)
+        (assoc ::schedule/request request
+               ::schedule/t rtime)
+        (merge (when-let [store (get-in request-params [state :store])]
+                 {::schedule/store store}))
         (assoc-in [::request-seqs state] more))))
 
 (defn schedule
   "Return a lazy sequence of Requesinator request templates."
-  [generator requests graph]
+  [generator request-params graph]
   ;; Get a lazy sequence of all the various request types, then draw
   ;; from them as we hit each one
-  (let [request-seqs (->> requests
+  (let [request-seqs (->> request-params
                           (map (fn [[state params]]
                                  [state (request/generate generator params)]))
                           (into {}))]
@@ -32,17 +34,16 @@
                             :delay-ops {'constant (fn [rtime t] t)
                                         'erlang (fn [rtime mean] (math/erlang mean))}}
                            [{:state :start :rtime 0}])
-          (reductions produce-request {::request nil
+          (reductions produce-request {::schedule/request nil
+                                       :request-params request-params
                                        ::request-seqs request-seqs})
-          (remove #(-> % ::request nil?))
-          (map (fn [{:keys [::request ::t]}]
-                 {::schedule/t t
-                  ::schedule/request request})))))
+          (remove #(-> % ::schedule/request nil?))
+          (map #(select-keys % [::schedule/request ::schedule/t ::schedule/store])))))
 
-(defrecord MarkovRequestScheduler [requests graph]
+(defrecord MarkovRequestScheduler [request-params graph]
   schedule/RequestScheduler
   (-schedule [this generator]
-    (schedule generator requests graph)))
+    (schedule generator request-params graph)))
 
 (defmethod ser/edn-readers :markov
   [_ relative-to]

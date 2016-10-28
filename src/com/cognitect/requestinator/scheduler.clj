@@ -13,8 +13,9 @@
 ;; We consolidate calls to -schedule through this function so that we
 ;; have a central place to add things like logging.
 (defn schedule
-  "Generate an agenda, a lazy sequence of maps with times and
-  requests. Call this in preference to the -schedule protocol method."
+  "Generate an agenda, a lazy sequence of maps with
+  keys ::t, ::request, and (optionally) ::store. Call this in
+  preference to the -schedule protocol method."
   [scheduler spec]
   (-schedule scheduler spec))
 

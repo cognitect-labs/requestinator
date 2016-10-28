@@ -67,7 +67,7 @@
     ;; Any states that do not have an entry in the requests map will
     ;; be skipped, but subsequent states will still be generated. This
     ;; allows "parking" states.
-    :requests {:query-by-status { ;; Path and method are the keys into
+    :request-params {:query-by-status { ;; Path and method are the keys into
                                   ;; the Swagger document for the
                                   ;; endpoint the request will be made
                                   ;; against. If either are not

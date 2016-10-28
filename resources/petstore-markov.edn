@@ -7,14 +7,14 @@
  :requestinator/agent-groups
  [{:requestinator.agent/count 10
    :requestinator.agent/tag "markov"
-   :requestinator.agent/generator
-   #requestinator.generators/markov
-   {:requests {:query-by-status {:path "/pet/findByStatus"
-                                 :method "get"}
-               :query-by-tags   {:path "/pet/findByTags"
-                                 :method "get"}
-               :pet-by-id       {:path   "/pet/{petId}"
-                                 :method "get"}}
+   :requestinator.agent/scheduler
+   #requestinator.scheduler/markov
+   {:request-params {:query-by-status {:path "/pet/findByStatus"
+                                       :method "get"}
+                     :query-by-tags   {:path "/pet/findByTags"
+                                       :method "get"}
+                     :pet-by-id       {:path   "/pet/{petId}"
+                                       :method "get"}}
     :graph    {:start           [{:query-by-status {:weight 1
                                                     :delay (constant #seconds 1)}
                                   :query-by-tags   {:weight 1

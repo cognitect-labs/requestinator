@@ -82,14 +82,14 @@
              :let [agent-id (format "%s-%04d" tag agent-num)]]
          (loop [schedule   (schedule/schedule scheduler spec)
                 agent-info {}]
-           (let [[{:keys [::schedule/t ::schedule/request]} & more] schedule]
+           (let [[{:keys [::schedule/t ::schedule/request] :as action} & more] schedule]
              (if (or (nil? request) (< duration t))
                [agent-id agent-info]
                (let [path (format "%s/%010d.transit"
                                   agent-id
                                   (long (* t 1000)))]
                  (recorder path
-                           (ser/encode request {:handlers write-handlers}))
+                           (ser/encode action {:handlers write-handlers}))
                  (recur more
                         (assoc-in agent-info
                                   [:requests t]
@@ -115,18 +115,18 @@
 
 (defn create-fetcher
   "Returns a running fetcher that will get objects described by
-  `request-infos` and place them on `output-chan`. `request-infos` is
+  `action-infos` and place them on `output-chan`. `action-infos` is
   a sequence of maps containing key `path`."
-  [request-infos output-chan fetch-f read-handlers]
+  [action-infos output-chan fetch-f read-handlers]
   (log/debug "create-fetcher" :read-handlers read-handlers)
   (let [worker (Thread.
                 (fn []
                   (try
-                    (doseq [{:keys [path] :as request-info} request-infos]
+                    (doseq [{:keys [path] :as action-info} action-infos]
                       (log/debug "Fetching" :path path)
                       (async/>!! output-chan
-                                 (assoc request-info
-                                        :request (ser/decode (fetch-f path)
+                                 (assoc action-info
+                                        :action (ser/decode (fetch-f path)
                                                              {:handlers read-handlers}))))
                     (catch Throwable t
                       (log/error t "Error in fetcher"))
@@ -146,11 +146,11 @@
                 (fn []
                   (try
                     (loop []
-                      (when-let [{:keys [t] :as request-info} (<!! input-chan)]
-                        (log/debug "Throttler awaiting" :t t :path (:path request-info))
+                      (when-let [{:keys [t] :as action-info} (<!! input-chan)]
+                        (log/debug "Throttler awaiting" :t t :path (:path action-info))
                         (await-t start t)
-                        (log/debug "Throttler releasing" :t t :path (:path request-info))
-                        (>!! output-chan request-info)
+                        (log/debug "Throttler releasing" :t t :path (:path action-info))
+                        (>!! output-chan action-info)
                         (recur)))
                     (catch Throwable t
                       (log/error t "Error in throttler"))
@@ -168,6 +168,7 @@
 
 (defmethod storage-op 'response-body-json
   [op {:keys [response]} path]
+  (log/debug "storing response-body-json" :path path)
   (-> response
       :body
       json/read-str
@@ -175,16 +176,15 @@
 
 (defn things-to-store
   "Returns a map of values to be stored in the agent context."
-  [{:keys [agent-memory request-template request response] :as context}]
-  (let [{:keys [store]} request-template]
-    (into {}
-          (for [[k v] store
-                :let [e (sexp/eval v
-                          #(get context %)
-                          (fn [op args]
-                            (apply storage-op op context args)))]
-                :when (some? e)]
-            [k e]))))
+  [{:keys [agent-memory store request response] :as context}]
+  (into {}
+        (for [[k v] store
+              :let [e (sexp/eval v
+                                 #(get context %)
+                                 (fn [op args]
+                                   (apply storage-op op context args)))]
+              :when (some? e)]
+          [k e])))
 
 (defn create-agent
   "Returns a running agent that will consume request info maps from
@@ -198,9 +198,9 @@
                   (try
                     (loop [agent-memory {}]
                       (log/debug "agent-memory" agent-memory)
-                      (when-let [{:keys [request] :as request-info} (<!! input-chan)]
-                        (log/debug "Agent requesting" :path (:path request-info))
-                        (let [request-template request
+                      (when-let [{:keys [action] :as action-info} (<!! input-chan)]
+                        (log/debug "Agent requesting" :path (:path action-info))
+                        (let [request-template (::schedule/request action)
                               request (request/fill-in request-template agent-memory)
                               actual-t (elapsed start)
                               begin (System/currentTimeMillis)
@@ -208,7 +208,7 @@
                               end (System/currentTimeMillis)
                               duration (/ (- end begin) 1000.0)]
                           (>!! output-chan
-                               (assoc request-info
+                               (assoc action-info
                                       :actual-t actual-t
                                       :request request
                                       :request-template request-template
@@ -216,7 +216,7 @@
                                       :duration duration))
                           (recur (merge agent-memory
                                         (things-to-store {:agent-memory agent-memory
-                                                          :request-template request-template
+                                                          :store (::schedule/store action)
                                                           :request request
                                                           :response response}))))))
                     (catch Throwable t
@@ -301,7 +301,7 @@
   (let [index       (ser/decode (fetch-f "index.transit") {:handlers read-handlers})
         agent-count (count index)
         processes   (for [[agent-id agent-info] index]
-                      (let [request-infos (sort-by :t
+                      (let [action-infos (sort-by :t
                                                    (for [[t path] (:requests agent-info)]
                                                      {:t        t
                                                       :path     path
@@ -313,7 +313,7 @@
                          :->throttler ->throttler
                          :->agent     ->agent
                          :->recorder  ->recorder
-                         :fetcher     (create-fetcher request-infos
+                         :fetcher     (create-fetcher action-infos
                                                       ->throttler
                                                       fetch-f
                                                       read-handlers)
