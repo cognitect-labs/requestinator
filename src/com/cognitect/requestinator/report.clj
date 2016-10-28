@@ -210,13 +210,17 @@
                     "images/curl.svg"
                     "images/clipboard.svg"
                     "images/spinner.gif"]]
-    (->> resource
-         (str "assets/")
-         io/resource
-         io/file
-         .toPath
-         java.nio.file.Files/readAllBytes
-         (record-f resource))))
+    (with-open [in (.getResourceAsStream ClassLoader (str "/assets/" resource))]
+      (let [baos (java.io.ByteArrayOutputStream.)
+            size 1024
+            buf (byte-array size)]
+        (loop []
+          (let [read (.read in buf 0 size)]
+            (when (not (neg? read))
+              (.write baos buf 0 read)
+              (recur))))
+        (.flush baos)
+        (record-f resource (.toByteArray baos))))))
 
 (defn request-line
   "Returns HTML data for rendering the first line of a request."
