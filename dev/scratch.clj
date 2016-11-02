@@ -160,16 +160,18 @@
                "file://tmp/requestinator"
                #_"file://tmp/requestinator/results")]
   (->> #_"index.transit"
-       "markov-0000/0000011085.transit"
+       "markov-0000/0000003947.transit"
        fetcher
        ser/decode
        #_(map :agent-id)
        #_distinct
        #_sort
-       :store
-       first
-       val
-       seq?))
+       #_:store
+       #_first
+       #_val
+       #_seq?
+       :com.cognitect.requestinator.scheduler/request
+       pprint))
 
 
 (report/write-js (ser/create-recorder "file:///tmp/requestinator-test/")

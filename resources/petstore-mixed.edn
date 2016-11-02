@@ -1,4 +1,4 @@
-{;; The spec is the description of the web service we're trying to
+{ ;; The spec is the description of the web service we're trying to
  ;; test. Currently, only Swagger specifications are
  ;; supported.
  :requestinator/spec
@@ -6,7 +6,7 @@
  ;; A swagger specification consists of a base specification,
  ;; generally read directly from the system under test, and optional
  ;; amendments.
- {;; Currently, base and amendments must be a URL that points to a
+ { ;; Currently, base and amendments must be a URL that points to a
   ;; Swagger document. In the future, we may support other sources,
   ;; like allowing the Swagger and amendments to appear inline in this
   ;; file.
@@ -25,7 +25,7 @@
  ;; requests using a particular model and running concurrently with
  ;; other groups.
  :requestinator/agent-groups
- [{;; Three agents in this group
+ [{ ;; Three agents in this group
    :requestinator.agent/count 3
    ;; The tag is used to uniquely identify agent groups. It forms part
    ;; of the path to the various files related to the agent in the
@@ -38,7 +38,7 @@
    ;; below) are implemented.
    :requestinator.agent/scheduler
    #requestinator.scheduler/uniform
-   {;; Generate requests with an Erlang-distributed interarrival time,
+   { ;; Generate requests with an Erlang-distributed interarrival time,
     ;; with a mean of 1 second
     :interarrival #seconds 1}}
   {:requestinator.agent/count 5
@@ -63,40 +63,40 @@
                                                   :delay  (erlang #seconds 10)}}]
                :query-by-tags   [{:pet-by-id {:weight 1
                                               :delay  (erlang #seconds 10)}}]}
-    ;; Requests turn states from the graph above into actual requests.
-    ;; Any states that do not have an entry in the requests map will
-    ;; be skipped, but subsequent states will still be generated. This
-    ;; allows "parking" states.
+    ;; Request params specify how states from the graph above turn
+    ;; into actual requests. Any states that do not have an entry in
+    ;; the requests map will be skipped, but subsequent states will
+    ;; still be generated. This allows "parking" states.
     :request-params {:query-by-status { ;; Path and method are the keys into
-                                  ;; the Swagger document for the
-                                  ;; endpoint the request will be made
-                                  ;; against. If either are not
-                                  ;; present, a selection will be made
-                                  ;; randomly from all the available
-                                  ;; choices.
-                                 :path "/pet/findByStatus"
-                                 :method "get"
-                                 ;; Parameters can be overriden by
-                                 ;; literal values, or by dynamic
-                                 ;; expressions (see below).
-                                 :param-overrides {"status" ["available"]}}
-               :query-by-tags   {:path "/pet/findByTags"
-                                 :method "get"
-                                 :param-overrides {"tags" ["tag1"]}
-                                 ;; We can "store" facts from the
-                                 ;; actual requests and responses
-                                 ;; under keys. This memory is
-                                 ;; agent-local. Currently, only
-                                 ;; `response-body-json` is supported.
-                                 ;; It takes a JSON pointer and stores
-                                 ;; the data found there in the body.
-                                 :store {"pet-id" (response-body-json "#/0/id")}}
-               :pet-by-id       {:path   "/pet/{petId}"
-                                 :method "get"
-                                 ;; Parameters can be overridden by
-                                 ;; previous-stored value via a
-                                 ;; `recall`, which takes a key and
-                                 ;; a default value to use if no
-                                 ;; value has yet been stored.
-                                 :param-overrides {"petId" #requestinator/recall ["pet-id" 42]}}}}}]}
+                                       ;; the Swagger document for the
+                                       ;; endpoint the request will be made
+                                       ;; against. If either are not
+                                       ;; present, a selection will be made
+                                       ;; randomly from all the available
+                                       ;; choices.
+                                       :path "/pet/findByStatus"
+                                       :method "get"
+                                       ;; Parameters can be overriden by
+                                       ;; literal values, or by dynamic
+                                       ;; expressions (see below).
+                                       :param-overrides {"status" ["available"]}}
+                     :query-by-tags   {:path "/pet/findByTags"
+                                       :method "get"
+                                       :param-overrides {"tags" ["tag1"]}
+                                       ;; We can "store" facts from the
+                                       ;; actual requests and responses
+                                       ;; under keys. This memory is
+                                       ;; agent-local. Currently, only
+                                       ;; `response-body-json` is supported.
+                                       ;; It takes a JSON pointer and stores
+                                       ;; the data found there in the body.
+                                       :store {"pet-id" (response-body-json "#/0/id")}}
+                     :pet-by-id       {:path   "/pet/{petId}"
+                                       :method "get"
+                                       ;; Parameters can be overridden by
+                                       ;; previous-stored value via a
+                                       ;; `recall`, which takes a key and
+                                       ;; a default value to use if no
+                                       ;; value has yet been stored.
+                                       :param-overrides {"petId" #requestinator/recall ["pet-id" 42]}}}}}]}
 

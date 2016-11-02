@@ -16,6 +16,5 @@
          ;; TODO: Support parameters at some point
          (request/generate generator {}))))
 
-(defmethod ser/edn-readers :uniform
-  [_ relative-to]
-  {'requestinator.scheduler/uniform map->UniformRequestScheduler})
+(ser/register-handlers!
+ {:edn {:read {'requestinator.scheduler/uniform map->UniformRequestScheduler}}})

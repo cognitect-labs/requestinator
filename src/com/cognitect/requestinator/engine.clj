@@ -55,17 +55,12 @@
     (-evaluate val context)
     val))
 
-(defmethod ser/transit-read-handlers :engine
-  [_]
-  {(.getName Recall) (transit/record-read-handler Recall)})
+;;; Serialization
 
-(defmethod ser/transit-write-handlers :engine
-  [_]
-  {Recall (transit/record-write-handler Recall)})
-
-(defmethod ser/edn-readers :engine
-  [_ relative-to]
-  {'requestinator/recall make-recall})
+(ser/register-handlers!
+ {:transit {:read  {(.getName Recall) (transit/record-read-handler Recall)}
+            :write {Recall (transit/record-write-handler Recall)}}
+  :edn     {:read {'requestinator/recall make-recall}}})
 
 ;;; Generation
 
@@ -75,7 +70,7 @@
   `com.cognitect.requestinator.request.RequestGenerator` and
   records them using `recorder`. Does not actually issue the requests
   to produce responses."
-  [{:keys [::r/spec ::r/duration ::r/agent-groups recorder write-handlers]
+  [{:keys [::r/spec ::r/duration ::r/agent-groups recorder]
     :as opts}]
   (->> (for [{:keys [::agent/count ::agent/tag ::agent/scheduler]} agent-groups
              agent-num (range count)
@@ -89,7 +84,7 @@
                                   agent-id
                                   (long (* t 1000)))]
                  (recorder path
-                           (ser/encode action {:handlers write-handlers}))
+                           (ser/encode action))
                  (recur more
                         (assoc-in agent-info
                                   [:requests t]
@@ -117,8 +112,7 @@
   "Returns a running fetcher that will get objects described by
   `action-infos` and place them on `output-chan`. `action-infos` is
   a sequence of maps containing key `path`."
-  [action-infos output-chan fetch-f read-handlers]
-  (log/debug "create-fetcher" :read-handlers read-handlers)
+  [action-infos output-chan fetch-f]
   (let [worker (Thread.
                 (fn []
                   (try
@@ -126,8 +120,7 @@
                       (log/debug "Fetching" :path path)
                       (async/>!! output-chan
                                  (assoc action-info
-                                        :action (ser/decode (fetch-f path)
-                                                             {:handlers read-handlers}))))
+                                        :action (ser/decode (fetch-f path)))))
                     (catch Throwable t
                       (log/error t "Error in fetcher"))
                     (finally
@@ -297,8 +290,8 @@
     {::worker worker}))
 
 (defn execute
-  [{:keys [fetch-f record-f start recorder-concurrency read-handlers]}]
-  (let [index       (ser/decode (fetch-f "index.transit") {:handlers read-handlers})
+  [{:keys [fetch-f record-f start recorder-concurrency]}]
+  (let [index       (ser/decode (fetch-f "index.transit"))
         agent-count (count index)
         processes   (for [[agent-id agent-info] index]
                       (let [action-infos (sort-by :t
@@ -315,8 +308,7 @@
                          :->recorder  ->recorder
                          :fetcher     (create-fetcher action-infos
                                                       ->throttler
-                                                      fetch-f
-                                                      read-handlers)
+                                                      fetch-f)
                          :throttler   (create-throttler start ->throttler ->agent)
                          :agent       (create-agent start ->agent ->recorder)}))
         ->recorders  (map :->recorder processes)

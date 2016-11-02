@@ -45,6 +45,5 @@
   (-schedule [this generator]
     (schedule generator request-params graph)))
 
-(defmethod ser/edn-readers :markov
-  [_ relative-to]
-  {'requestinator.scheduler/markov map->MarkovRequestScheduler})
+(ser/register-handlers!
+ {:edn {:read {'requestinator.scheduler/markov map->MarkovRequestScheduler}}})

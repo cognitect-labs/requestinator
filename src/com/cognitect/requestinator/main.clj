@@ -2,7 +2,6 @@
   "An interface for external (command-line) invocation of
   requestinator functionality."
   (:require [clojure.core.async :refer [<!!] :as async]
-            [clojure.edn :as edn]
             [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.tools.logging :as log]
@@ -46,23 +45,18 @@
    :uniform
    :markov])
 
+(ser/register-handlers!
+ {:edn {:read {'seconds identity
+               'minutes #(* % 60)
+               'hours   #(* % 60 60)
+               'url     identity}}})
+
 (defn read-params
   [params-uri]
   (let [fetcher (ser/create-fetcher params-uri)]
     (->> (fetcher "")
          String.
-         (edn/read-string
-          {:readers
-           ;; TODO: Change this from passing params-uri to passing the
-           ;; fetcher, once the fetcher can deal with absolute URIs as
-           ;; a parameter.
-           (->> edn-serialization-types
-                (map #(ser/edn-readers % params-uri))
-                (reduce merge)
-                (merge {'seconds identity
-                        'minutes #(* % 60)
-                        'hours   #(* % 60 60)
-                        'url     identity}))}))))
+         ser/edn-read-string)))
 
 (defn generate
   [{:keys [destination
@@ -74,10 +68,7 @@
         params (read-params params-uri)]
     (engine/generate-activity-streams
      (assoc params
-            :recorder recorder
-            :write-handlers (->> transit-serialization-types
-                                 (map ser/transit-write-handlers)
-                                 (reduce merge)))))
+            :recorder recorder)))
   {:code    0
    :message "Success"})
 
@@ -94,10 +85,7 @@
                                           ;; just go with "10 seconds from now"
                                           :start                (java.util.Date. (+ (System/currentTimeMillis)
                                                                                     10000))
-                                          :recorder-concurrency recorder-concurrency
-                                          :read-handlers (->> transit-serialization-types
-                                                              (map ser/transit-read-handlers)
-                                                              (reduce merge))})]
+                                          :recorder-concurrency recorder-concurrency})]
     (loop []
       (when-let [msg (<!! status)]
         (println msg)

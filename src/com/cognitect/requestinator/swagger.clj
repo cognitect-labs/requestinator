@@ -285,14 +285,11 @@
                             json/read-str)]
     (->Generator (json-helper/amend spec amendments))))
 
-(defmethod ser/transit-read-handlers :swagger
-  [_]
-  {(.getName Template) (transit/record-read-handler Template)})
-
-(defmethod ser/transit-write-handlers :swagger
-  [_]
-  {Template (transit/record-write-handler Template)})
-
-(defmethod ser/edn-readers :swagger
-  [_ relative-to]
-  {'requestinator.spec/swagger #(read-spec relative-to %)})
+(ser/register-handlers!
+ {:transit {:read  {(.getName Template) (transit/record-read-handler Template)}
+            :write {Template (transit/record-write-handler Template)}}
+  ;; TODO: support relative file resolution. We used to pass through
+  ;; the base-uri parameters, but with the switch to consolidate
+  ;; handlers in the serialization namespace, that ability was lost.
+  ;; Still need to add it back in.
+  :edn     {:read {'requestinator.spec/swagger #(read-spec nil %)}}})

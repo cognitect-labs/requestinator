@@ -83,17 +83,8 @@
 ;;         (get "data")
 ;;         (get "__schema"))))
 
-(defmethod ser/transit-read-handlers :graphql
-  [format]
-  ;; TODO
-  {})
-
-(defmethod ser/transit-write-handlers :graphql
-  [format]
-  ;; TODO
-  {})
-
-(defmethod ser/edn-readers :graphql
-  [_ relative-to]
-  ;; TODO
-  )
+;; TODO
+#_(ser/register-handlers
+ {:transit {:read {}
+            :write {}}
+  :edn {:read {}}})
