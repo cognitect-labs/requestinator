@@ -1,0 +1,40 @@
+* Tasks
+** INPROGRESS Refactor read and write handlers to register-handlers
+   :LOGBOOK:
+   - State "INPROGRESS" from "TODO"       [2016-10-31 Mon 12:03]
+   :END:
+** TODO Spike: use Swagger to create specs/generators
+** TODO Generate an activity stream from a GraphQL schema [0/1]
+*** TODO Ability to execute at a given start time
+** TODO This is “distributed execution lite”
+** TODO Coordinated distributed execution [/]
+*** TODO Build a coordinator/scheduler that is responsible for scheduling execution
+*** TODO Survey existing infrastructure
+- AWS? Other? Job scheduling? Mesos? Kubernetes?
+** TODO Store the input specification in the index
+** TODO In the activity stream, record an expectation about the return value.
+** TODO Record sufficient information to trace validation errors back to the relevant part of the specification.
+** TODO Apply validation to return values. [0/1]
+- [ ] When? During execution or afterwards?
+** TODO Incorporate validation failures into the report HTML and visualization.
+** TODO Add a report view of just the validation errors. (Dynamic filtering is acceptable.)
+** TODO Make report comprehensible to “man on the street” users. [0/3]
+ (I.e., people who didn’t write Requestinator.)
+*** TODO Legend for the report
+*** TODO Summary information
+*** TODO “Green light/red light” overview
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
