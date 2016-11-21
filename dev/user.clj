@@ -6,6 +6,8 @@
             [clojure.java.io :as io]
             [clojure.pprint :refer [pprint]]
             [clojure.repl :refer :all]
+            [clojure.spec :as s]
+            [clojure.spec.gen :as sgen]
             [clojure.test.check.generators :as tcgen]
             [clojure.tools.logging :as log]
             [clojure.tools.namespace.repl :refer [refresh refresh-all]]

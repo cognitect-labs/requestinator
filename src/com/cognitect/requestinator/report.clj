@@ -10,10 +10,11 @@
 (defn detail-uri
   "Returns a relative URI (as a string) to the detail report for a
   given item."
-  [{:keys [agent-id t] :as item}]
+  [{:keys [agent-group agent-num t] :as item}]
   ;; TODO: Change
-  (format "detail/%s/%010d.html"
-          agent-id
+  (format "detail/%s-%04d/%010d.html"
+          agent-group
+          agent-num
           (long (* t 1000))))
 
 (defn time-lod
@@ -51,35 +52,33 @@
         [:span#instructions
          {:style "display: none;"}
          "Hover over a request in the timeline to display details of the reqeust. Click it to lock. Click again to unlock it, or click another request to lock a new one. Hold down the shift key and scroll with the mouse to zoom the time dimension in and out."]]
-       (let [agent-numbers (zipmap (->> index
-                                        (map :agent-id)
-                                        distinct
-                                        sort)
-                                   (range))
-             data (group-by :agent-id index)
-             max-t (->> index
-                        (map :actual-t)
-                        (reduce max)
-                        (+ 0.25))
-             max-agent (count data)]
+       (let [data        (group-by (juxt :agent-group :agent-num) index)
+             lines       (->> data keys sort)
+             line-number (zipmap lines (range))
+             max-t       (->> index
+                              (map :actual-t)
+                              (reduce max)
+                              (+ 0.25))
+             line-count  (count lines)]
          [:div#timeline-container
           [:svg {:xmlns "http://www.w3.org/2000/svg"
                  "xmlns:svg" "http://www.w3.org/2000/svg"
                  :id "timeline"
-                 :agent-numbers agent-numbers
-                 :max-agent max-agent
+                 ;; :agent-numbers agent-numbers
+                 :line-count line-count
                  :max-t max-t
                  ;; TODO: This is sort of an arbitrary heuristic. Can we fix it?
-                 :height (format "%dpx" (* max-agent 10))
+                 :height (format "%dpx" (* line-count 10))
                  :preserveAspectRatio "none"}
            [:g#timeline-content
             ;; Row highlights
-            (for [[agent-id items] (sort-by first data)
-                  :let [agent-num (agent-numbers agent-id)]]
+            (for [line lines
+                  :let [items (get data line)
+                        line-num (line-number line)]]
               [[:rect {:class (str "timeline-outline "
-                                   (if (odd? agent-num) "odd" "even"))
+                                   (if (odd? line-num) "odd" "even"))
                        :x 0
-                       :y agent-num
+                       :y line-num
                        :width max-t
                        :height 0.99}]])
             (for [x (range 0 max-t)]
@@ -88,14 +87,14 @@
                  :x1 x
                  :x2 x
                  :y1 0
-                 :y2 max-agent}]])
+                 :y2 line-count}]])
             [:g.time-labels
              (let [x-scale 75
                    y-scale 10]
                (for [x (range 0 max-t)]
                  [:g {:transform (format "translate(%d, %d)"
                                          x
-                                         max-agent)}
+                                         line-count)}
                   [:g.scale-compensation
                    [:text
                     {:class (str "time-label time" (time-lod x))
@@ -106,11 +105,12 @@
                     (format "%d:%02d" (long (/ x 60)) (mod x 60))]]]))]
             ;; Highlighting of selected item
             [:rect#highlight-x {:x 0 :y 0 :width max-t :height 1}]
-            [:rect#highlight-y {:x 0 :y 0 :width 0 :height max-agent}]
+            [:rect#highlight-y {:x 0 :y 0 :width 0 :height line-count}]
             ;; The actual data points
-            (for [[agent-id items] (sort-by first data)
-                  {:keys [actual-t t status path duration] :as item} (sort-by (comp - :actual-t) items)
-                  :let [agent-num (agent-numbers agent-id)]]
+            (for [line lines
+                  :let [items (get data line)
+                        line-num (line-number line)]
+                  {:keys [actual-t t status path duration] :as item} (sort-by (comp - :actual-t) items)]
               (let [status-class (format "status%dxx" (-> status (/ 100) long))]
                 [:g
                  {:class "timeline-cell"
@@ -118,7 +118,7 @@
                  [:rect
                   {:class (str "timeline-rect actual " status-class)
                    :x actual-t
-                   :y (+ agent-num 0.1)
+                   :y (+ line-num 0.1)
                    :width duration
                    :height 0.8}]
                  #_[:g {:class (str "timeline-rect scheduled " status-class)
@@ -132,21 +132,21 @@
                  [:rect
                   {:class (str "timeline-rect scheduled " status-class)
                    :x t
-                   :y (+ agent-num 0.95)
+                   :y (+ line-num 0.95)
                    :width (- actual-t t)
                    :height 0.04}]
                  (let [width (min (- actual-t t) 0.0025)]
                    [:rect
                     {:class (str "timeline-rect scheduled " status-class)
                      :x (- actual-t width)
-                     :y (+ agent-num 0.92)
+                     :y (+ line-num 0.92)
                      :width width
                      :height 0.04}])
                  [:path {:class (str "timeline-handle " status-class)
                          :d (format "M%f %f L%f %f L%f %f z"
-                                    (float (+ actual-t duration)) (+ agent-num 0.1)
-                                    (float (+ actual-t duration 0.1)) (+ agent-num 0.5)
-                                    (float (+ actual-t duration)) (+ agent-num 0.9))}]]))]]])
+                                    (float (+ actual-t duration)) (+ line-num 0.1)
+                                    (float (+ actual-t duration 0.1)) (+ line-num 0.5)
+                                    (float (+ actual-t duration)) (+ line-num 0.9))}]]))]]])
        [:div#detail-container
         [:div#detail-loading
          {:style "display:none"}
@@ -328,9 +328,10 @@
 
 (defn write-details
   "Write the individual detail reports for each of the requests."
-  [index fetch-f record-f]
-  (doseq [{:keys [path agent-id t] :as item} index]
-    (let [{:keys [response]} (-> path fetch-f ser/decode)
+  [index record-f]
+  (doseq [{:keys [path agent-num agent-group t fetcher] :as item} index]
+    (let [{:keys [response]} (-> path fetcher ser/decode)
+          agent-id (format "%s/%04d" agent-group agent-num)
           ;; We use the request data in the response, because it
           ;; reflects the request that was *actually* made, including
           ;; cookies etc., rather than the request we said we were
@@ -381,8 +382,12 @@
 com.cognitect.requestinator.report.render_json('json-body');"]]])))))
 
 (defn report
-  [{:keys [fetch-f record-f]}]
-  (let [index (ser/decode (fetch-f "index.transit"))]
-    (write-shared-files record-f)
-    (write-index index record-f)
-    (write-details index fetch-f record-f)))
+  [{:keys [fetchers recorder]}]
+  (let [index (->> fetchers
+                   (mapcat (fn [fetcher]
+                             (->> (fetcher "index.transit")
+                                  ser/decode
+                                  (map #(assoc % :fetcher fetcher)))))) ]
+    (write-shared-files recorder)
+    (write-index index recorder)
+    (write-details index recorder)))

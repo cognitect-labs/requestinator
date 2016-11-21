@@ -258,7 +258,7 @@
   [t-scale]
   (let [timeline (gdom/getElement "timeline")
         timeline-content (gdom/getElement "timeline-content")
-        max-agent (-> timeline (.getAttribute "max-agent") js/Number.)
+        line-count (-> timeline (.getAttribute "line-count") js/Number.)
         max-t (-> timeline (.getAttribute "max-t") js/Number.)
         compensator (style-elem "scale-compensator")
         x-lod (style-elem "x-lod")]
@@ -287,10 +287,10 @@
     (doseq [[n v] [["t-scale" t-scale]
                    ["t-scroll" @t-scroll]
                    ["max-t" max-t]
-                   ["max-agent" max-agent]
+                   ["line-count" line-count]
                    ["viewBox" (gstring/format "0 0 %f %d"
                                               (double (* t-scale max-t))
-                                              (inc max-agent))]]]
+                                              (inc line-count))]]]
       (.setAttributeNS timeline nil n v))))
 
 (defn jsx->clj

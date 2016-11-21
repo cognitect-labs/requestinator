@@ -72,23 +72,24 @@
   to produce responses."
   [{:keys [::r/spec ::r/duration ::r/agent-groups recorder]
     :as opts}]
-  (->> (for [{:keys [::agent/count ::agent/tag ::agent/scheduler]} agent-groups
-             agent-num (range count)
-             :let [agent-id (format "%s-%04d" tag agent-num)]]
-         (loop [schedule   (schedule/schedule scheduler spec)
-                agent-info {}]
-           (let [[{:keys [::schedule/t ::schedule/request] :as action} & more] schedule]
-             (if (or (nil? request) (< duration t))
-               [agent-id agent-info]
-               (let [path (format "%s/%010d.transit"
-                                  agent-id
-                                  (long (* t 1000)))]
-                 (recorder path
-                           (ser/encode action))
-                 (recur more
-                        (assoc-in agent-info
-                                  [:requests t]
-                                  path)))))))
+  (->> (for [[group-id {:keys [::agent/count ::agent/tag ::agent/scheduler]}] agent-groups]
+         [group-id
+          (for [agent-num (range count)
+                :let [agent-id (format "%s/%04d" group-id agent-num)]]
+            (loop [schedule   (schedule/schedule scheduler spec)
+                   agent-info {}]
+              (let [[{:keys [::schedule/t ::schedule/request] :as action} & more] schedule]
+                (if (or (nil? request) (< duration t))
+                  agent-info
+                  (let [path (format "%s/%012d.transit"
+                                     agent-id
+                                     (long (* t 1000000)))]
+                    (recorder path
+                              (ser/encode action))
+                    (recur more
+                           (assoc-in agent-info
+                                     [:requests t]
+                                     path)))))))])
        (into (sorted-map))
        ser/encode
        (recorder "index.transit")))
@@ -253,7 +254,8 @@
                                                (select-keys [:t
                                                              :actual-t
                                                              :path
-                                                             :agent-id
+                                                             :agent-num
+                                                             :agent-group
                                                              :duration])
                                                (assoc :status
                                                       (get-in val [:response :status]))))))))))
@@ -290,20 +292,22 @@
     {::worker worker}))
 
 (defn execute
-  [{:keys [fetch-f record-f start recorder-concurrency]}]
-  (let [index       (ser/decode (fetch-f "index.transit"))
-        agent-count (count index)
-        processes   (for [[agent-id agent-info] index]
+  [{:keys [fetch-f record-f start recorder-concurrency groups]}]
+  (let [index-all   (ser/decode (fetch-f "index.transit"))
+        agent-groups (or groups (keys index-all))
+        index       (select-keys index-all agent-groups)
+        processes   (for [[agent-group agent-infos] index
+                          [agent-num agent-info] (map-indexed vector agent-infos)]
                       (let [action-infos (sort-by :t
                                                    (for [[t path] (:requests agent-info)]
                                                      {:t        t
                                                       :path     path
-                                                      :agent-id agent-id}))
+                                                      :agent-num agent-num
+                                                      :agent-group agent-group}))
                             ->throttler   (async/chan 10)
                             ->agent       (async/chan 1)
                             ->recorder    (async/chan 10)]
-                        {:agent-id    agent-id
-                         :->throttler ->throttler
+                        {:->throttler ->throttler
                          :->agent     ->agent
                          :->recorder  ->recorder
                          :fetcher     (create-fetcher action-infos

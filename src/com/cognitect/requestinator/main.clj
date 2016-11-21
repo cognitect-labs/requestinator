@@ -33,6 +33,36 @@
   (str "The following errors occurred while parsing your command:\n\n"
        (str/join \newline errors)))
 
+(defn parse-time
+  "Parses a java.util.Date from the provided string. Date formats
+  supported are as per
+  `org.joda.time.format.ISODateTimeFormat/dateTimeParser`, but
+  additionally supports a bare time (with no leading 'T'). If date is
+  not provided, today is assumed. Assumes the default time zone if one
+  is not provided."
+  [s]
+  (let [fmt    (org.joda.time.format.ISODateTimeFormat/dateTimeParser)
+        parse #(try
+                 (.parseDateTime fmt %)
+                 (catch IllegalArgumentException _ nil))]
+    (when-let [d (or (parse s)
+                     (parse (str "T" s)))]
+      (.toDate (if (= [1970 1] [(.getYear d) (.getDayOfYear d)])
+                 (let [now (org.joda.time.DateTime/now)]
+                   (.withDate d (.getYear now) (.getMonthOfYear now) (.getDayOfMonth now)))
+                 d)))))
+
+(defn before?
+  "Returns true if Date `a` is before `b`."
+  [^java.util.Date a ^java.util.Date b]
+  (< (.getTime a) (.getTime b)))
+
+(defn valid-start?
+  "Returns true if `d` is a valid start time."
+  [d]
+  (and (some? d)
+       (before? (java.util.Date.) d)))
+
 (def transit-serialization-types
   [:swagger
    :graphql
@@ -73,18 +103,16 @@
    :message "Success"})
 
 (defn execute
-  [{:keys [source destination start recorder-concurrency] :as options} arguments]
+  [{:keys [source destination start groups recorder-concurrency] :as options} arguments]
   (log/debug "Execute" :options)
   (let [fetcher  (ser/create-fetcher source)
         recorder (ser/create-recorder destination)
         {:keys [status]} (engine/execute {:fetch-f              fetcher
                                           :record-f             recorder
-                                          ;; There is support in the API for delaying the
-                                          ;; start, but I haven't figured out how best to
-                                          ;; pass it in via the CLI, so for the moment we
-                                          ;; just go with "10 seconds from now"
-                                          :start                (java.util.Date. (+ (System/currentTimeMillis)
-                                                                                    10000))
+                                          :start                (or start
+                                                                    (java.util.Date. (+ (System/currentTimeMillis)
+                                                                                        10000)))
+                                          :groups               groups
                                           :recorder-concurrency recorder-concurrency})]
     (loop []
       (when-let [msg (<!! status)]
@@ -95,36 +123,63 @@
      :message "Success"}))
 
 (defn report
-  [{:keys [source destination] :as options} arguments]
-  (println "Building report" :source source :destination destination)
-  (let [fetcher (ser/create-fetcher source)
+  [{:keys [sources destination] :as options} arguments]
+  (println "Building report" :sources sources :destination destination)
+  (let [fetchers (map ser/create-fetcher sources)
         recorder (ser/create-recorder destination)]
-    (report/report {:fetch-f fetcher
-                    :record-f recorder}))
+    (report/report {:fetchers fetchers
+                    :recorder recorder}))
   {:code 0
    :message "Success"})
 
 (def commands
-  {"generate" {:cli-spec [["-d" "--destination DESTINATION" "Path to destination for generated requests"
+  {"generate" {:cli-spec [["-d"
+                           "--destination DESTINATION"
+                           "Path to destination for generated requests"
                            :id :destination
                            :validate [some? "Required"]]
-                          ["-p" "--params PARAMS_LOCATION"
+                          ["-p"
+                           "--params PARAMS_LOCATION"
                            "Location of parameters file"
                            :id :params-uri
                            :validate [some? "Required"]]]
                :impl generate}
-   "execute" {:cli-spec [["-s" "--source REQUEST_SOURCE" "Path to location of requests"
+   "execute" {:cli-spec [["-s"
+                          "--source REQUEST_SOURCE"
+                          "Path to location of requests"
                           :id :source]
-                         ["-d" "--destination DESTINATION" "Path to destination for results"
+                         ["-d"
+                          "--destination DESTINATION"
+                          "Path to destination for results"
                           :id :destination]
-                         ["-n" "--recorder-concurrency RECORDER_CONCURRENCY" "Number of threads to use to record results"
+                         ["-t"
+                          "--start-time START_TIME"
+                          "Start time for the test run. Defaults to an immediate start."
+                          :id :start-time
+                          :parse-fn parse-time
+                          :validate [valid-start? "Must be a valid time in the future."]]
+                         ["-n"
+                          "--recorder-concurrency RECORDER_CONCURRENCY"
+                          "Number of threads to use to record results"
                           :id :recorder-concurrency
                           :parse-fn #(Long. %)
-                          :validate [integer? "Must be an integer"]]]
+                          :validate [integer? "Must be an integer"]]
+                         ["-g"
+                          "--group GROUP"
+                          "Agent group to execute. Can be specified multiple times to execute more than one group concurrently. Optional - defaults to executing all groups."
+                          :id :groups
+                          :assoc-fn (fn [m k v]
+                                      (assoc m k (conj (get m k #{}) v)))]]
               :impl execute}
-   "report" {:cli-spec [["-s" "--source RESULTS_SOURCE" "Path to the directory containing the results index."
-                         :id :source]
-                        ["-d" "--destination DESTINATION" "Path where report files will be writen."
+   "report" {:cli-spec [["-s"
+                         "--source RESULTS_SOURCE"
+                         "Path to the directory containing the results index. Can be specified multiple times to merge multiple runs."
+                         :id :sources
+                         :assoc-fn (fn [m k v]
+                                     (assoc m k (conj (get m k #{}) v)))]
+                        ["-d"
+                         "--destination DESTINATION"
+                         "Path where report files will be writen."
                          :id :destination]]
              :impl report}})
 

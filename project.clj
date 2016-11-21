@@ -17,7 +17,8 @@
                  [org.clojure/tools.cli "0.3.5"]
                  [org.apache.commons/commons-lang3 "3.4"]
                  [org.craigandera/causatum "0.3.0"]
-                 [data.graphql "0.1.0-SNAPSHOT"]]
+                 [data.graphql "0.1.0-SNAPSHOT"]
+                 [joda-time "2.9.6"]]
   :main ^:skip-aot com.cognitect.requestinator.main
   :repl-options {:init-ns user}
   :source-paths ["src" "spec"]
