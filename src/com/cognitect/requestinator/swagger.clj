@@ -91,10 +91,9 @@
 
 (defn param-generator
   [spec param]
-  (let [{:strs [in name]} param]
-    (gen/let [v (param-value-generator spec param)]
-      (assoc param
-             :value v))))
+  (gen/let [v (param-value-generator spec param)]
+    (assoc param
+           :value v)))
 
 (defn params-generator
   [spec params]
