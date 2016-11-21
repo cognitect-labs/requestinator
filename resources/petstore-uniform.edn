@@ -4,8 +4,8 @@
   :amendments nil}
  :requestinator/duration #minutes 15
  :requestinator/agent-groups
- [{:requestinator.agent/count 50
-   :requestinator.agent/tag "uniform"
-   :requestinator.agent/generator
-   #requestinator.generators/uniform
-   {:interarrival #seconds 10}}]}
+ {"default" {:requestinator.agent/count 50
+             :requestinator.agent/tag "uniform"
+             :requestinator.agent/scheduler
+             #requestinator.scheduler/uniform
+             {:interarrival #seconds 10}}}}

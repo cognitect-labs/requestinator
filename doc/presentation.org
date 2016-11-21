@@ -1,0 +1,81 @@
+* Requestinator
+** Executive Summary
+A generative testing tool for web services.
+** The Name
+[[file:~/Desktop/Screen%20Shot%202016-11-07%20at%203.28.14%20PM.png]]
+
+** Why Requestinator?
+- Want the advantages of generative testing for services
+  - Coverage
+  - Unanticipated inputs
+- Service specifications (once again) becoming prevalent
+  - Swagger
+  - GraphQL
+  - spec?
+- Simulation testing is very expensive
+- Requestinator: for when you want to trade schedule for features
+  - The "80% case" of service testing
+  - Lighter weight than Simulant
+
+** The Landscape
+[[file:testing.png]]
+
+** When Not to Use Requestinator
+- Complex validation
+- Complex request sequences/generation
+- High scale - tested to
+  - 50 agents
+  - 4 req/sec
+  - 15 minutes
+- Swagger unavailable
+
+** Process
+- Generates activity given a service descriptor
+- Executes a generated activity stream and records responses
+- Produces a report against them
+** What State is Requestinator In?
+- Has been developed as a side project
+- Has never been used in anger
+- But now rapidly moving to operational state
+- Is *not* open source
+  - Requires approval to use on client projects
+
+** Generation
+- Consumes a service description
+  - Swagger supported 90% (ignoring XML)
+  - Working on GraphQL
+  - Others, maybe someday - spec?
+- Produce an activity stream
+  - N agents
+  - Scheduled by a pluggable "scheduler"
+  - Filesystem/S3 "database" stores request templates
+
+** Execution
+- Reads the database
+- Resolves request templates to actual requests
+- Executes each agent independently
+- Records request/response in filesystem/S3 "database"
+
+** Request Template Resolution
+- Agents have memory
+- Response data can be extracted and remembered
+- Requests can use remembered data
+
+** Execution: 1.0 KWords
+[[file:execution.png]]
+
+** Demo
+** Other
+- Can execute stages via Docker
+- Swagger spec can be "amended" externally
+- Closed source
+
+** Future Work
+- GraphQL Support
+- Report improvements
+- Distributed execution
+- Validation of responses
+- Shrinking
+- Spec integration?
+
+** Questions?

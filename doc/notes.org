@@ -1,16 +1,148 @@
 * Tasks
-** INPROGRESS Refactor read and write handlers to register-handlers
+** DONE Refactor read and write handlers to register-handlers
+   CLOSED: [2016-11-02 Wed 13:54]
    :LOGBOOK:
+   - State "DONE"       from "INPROGRESS" [2016-11-02 Wed 13:54]
    - State "INPROGRESS" from "TODO"       [2016-10-31 Mon 12:03]
    :END:
 ** TODO Spike: use Swagger to create specs/generators
 ** TODO Generate an activity stream from a GraphQL schema [0/1]
-*** TODO Ability to execute at a given start time
 ** TODO This is “distributed execution lite”
-** TODO Coordinated distributed execution [/]
+** TODO Coordinated distributed execution [0/3]
 *** TODO Build a coordinator/scheduler that is responsible for scheduling execution
 *** TODO Survey existing infrastructure
 - AWS? Other? Job scheduling? Mesos? Kubernetes?
+*** TODO Ability to execute at a given start time?
+*** Notes
+- What's the goal here? Presumably the idea is to enable scale - throw
+  more load at a system than a single client can generate.
+- Looks like there are two problems that we need to solve:
+  - How to coordinate start times
+  - How to consolidate results
+- One thing we could do would be to split up execution at some of the
+  boundaries between the states in the execution pipeline and
+  distribute those.
+  - Not sure how that would work - how would we coordinate execution
+    time without being subject to network delays? Is that even
+    possible?
+  - Is there a way to determine clock skew between two machines?
+    - There's [[https://en.wikipedia.org/wiki/Cristian%2527s_algorithm][Cristian's algorithm]]
+    - There's also [[https://en.wikipedia.org/wiki/Berkeley_algorithm][the Berkeley Algorithm]]
+- [ ] Do we need a central server at all?
+  - Well, without it we either have to defer to NTP or give up on
+    synchronization.
+  - [ ] Is there any advantage to a home-rolled time sync protocol?
+    I.e. what makes us think we can do better than NTP?
+    - If we think clocks will drift as well as be skewed, then if
+      we're making periodic synchronization calls (and these work)
+      then we can maybe provide some limits on skew
+- [ ] Other than clock synchronization, so we need a central server at
+  all?
+  - I'm not sure we do. If the input data is all in S3, and the output
+    data all goes to S3, what else do we really need?
+- [ ] What should we use to actually execute?
+  - There's always just straight EC2 - define an AMI with some user
+    data parameters, fire a bunch of them up, and off we go.
+  - [ ] What about Lambda?
+    - I'm not sure Lambda is appropriate. We need the ability to have
+      a relatively small number of long-running tasks, which Lambda is
+      not really designed for.
+    - That said, at least it supports Java.
+    - [[http://docs.aws.amazon.com/lambda/latest/dg/concurrent-executions.html#concurrent-execution-safety-limit][Lambda has a soft concurrency limit of 100]]. You can request an
+      increase.
+    - Lambda has a 300 second execution limit.
+      - This would seem to be a killer.
+- [ ] What about Redshift?
+  - This looks to be a lot more focused on having a SQL table at one
+    end of the process, so probably not appropriate
+- [ ] What about AWS EMR?
+  - This is just Hadoop - probably not appropriate
+- [ ] What about Amazon Data Pipeline?
+  - Has a minimum scheduling interval of 15 minutes.
+- I really think we're looking at a home-rolled solution. Something
+  like a CloudFormation group that stands up, discovers its
+  configuration, and goes.
+  - Rather than use a server to coordinate times, can we just use a
+    database somehow? Maybe for group discovery and then they can all
+    talk to each other? Or would JGroups give us something like that?
+  - Ooh - we can just use metadata to discover all the instances in a
+    given group, and something like Dynamo to have them report when
+    ready. Or can the instances modify their own metadata? I guess
+    they don't really need to - they can just talk to each other. And
+    one of them can be the leader for purposes of determining the
+    time.
+- [ ] Can we really tie ourselves to AWS, though? What about
+  on-premise deployments?
+  - So what we really need is a way to:
+    1. Discover peers
+    2. Coordinate work with them
+  - Coordination can be among the peers. They can elect a leader and
+    then everyone can get the plan from her.
+  - Discovery could be pluggable. Via metadata if on AWS, explicit
+    otherwise, and other mechanisms later.
+  - [ ] How would leader election work?
+    - Could be as simple as a lexical sort on the IDs of the nodes
+      (which would obviously have to be known). Highest ID is the
+      leader.
+    - [ ] How would IDs be assigned?
+      - Could just pick a GUID.
+    - As long as the number of peers is known, all this should
+      work.
+  - [ ] We have the index of the generated data - does that help?
+    - If agent groups are assigned to individual peers, then each
+      peer can check in with the leader with its list of agent groups.
+      We know we're ready to go when all agent groups are accounted
+      for by ready peers.
+- So what does the algorithm look like?
+  - Each peer starts knowing
+    - Its ID
+    - A pointer to the index
+    - A list of agent groups it is responsible for
+    - A way to discover other peers (pluggable)
+  - It finds the list of other peers, picks the one with the highest
+    ID, and reports in with its ID, stating that it is ready to go
+    with the list of agent groups it's going to handle.
+  - The leader says either "waiting for everyone to check in - check
+    back in =n= seconds" or "good to go: test start time is =m=" or
+    "I'm not the leader: here's who is".
+    - =n= has to be less than the lead-in time for the start of the
+      test.
+    - Clock skew computation is part of this conversation
+  - If the leader is good to go, everyone starts running at the
+    appointed time.
+  - If the leader reports they are not the leader, start over with the
+    new leader
+- The leader should be checking for a new leader right up to the point
+  where all the agent groups are accounted for - at that point
+  everyone has checked in and we know we're not missing anyone
+- Of course, we can make it even easier: once the leader hears
+  everyone is checked in, she can call them back and say, "The test is
+  starting in ten seconds." And we can rely on NTP for the clock.
+- Protocol, take two:
+  - At startup, create an ID, discover peers
+  - Find peer with highest ID - this is leader
+  - Follower:
+    - Open SSE connection to leader, check in with ID & agent group
+    - Wait for messages
+    - New leader - switch and check in
+    - Start - start run at appointed time
+  - Leader
+    - Wait for clients to check in
+    - If client has higher ID, redirect everyone to new leader and
+      become follower
+    - Once all clients checked in, tell everyone to start in n seconds
+- [ ] Do we need the bit where the leader isn't known? If we have
+  discovery of peers, can't they just discover who the leader is at
+  the same time?
+- [ ] Do we need static assignment of agent groups? Does it really
+  matter who runs which one?
+  - Maybe - some of the groups might be a lot bigger than others.
+- I think maybe the above is all way more complicated than it needs to
+  be. We're relying on NTP for time. Let's just set up to allow
+  starting at a particular moment in time. Each peer/runner will
+  record the time it *actually* starts, since it could differ. That'll
+  support just about everything.
+
 ** TODO Store the input specification in the index
 ** TODO In the activity stream, record an expectation about the return value.
 ** TODO Record sufficient information to trace validation errors back to the relevant part of the specification.
@@ -23,18 +155,3 @@
 *** TODO Legend for the report
 *** TODO Summary information
 *** TODO “Green light/red light” overview
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

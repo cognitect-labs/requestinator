@@ -73,6 +73,36 @@ Hover over a request to see its details in the lower pane. Click one
 to "lock" it. Hold shift and scroll to zoom the time dimension in and
 out.
 
+## Distributed Execution
+
+Requestinator supports spreading execution of requests across multiple processes (and therefore multiple machines). This is accomplished by selecting a subset of agent groups (defined in the parameters file) and a start time for each executor process. Activity generation is unchanged and cannot currently be distributed.
+
+Assuming the same generation as above, the following commands would
+set up two separate processes to begin execution at 12:34PM. Process 1
+will run the agents in group "markov" and Process 2 will run the
+agents in group "uniform".
+
+```
+# Process 1
+lein run execute --source file:///tmp/requestinator-test --group markov --destination file:///tmp/requestinator-test/results/markov --start-time 12:34 --recorder-concurrency 3
+```
+
+```
+# Process 2
+lein run execute --source file:///tmp/requestinator-test --group uniform --destination file:///tmp/requestinator-test/results/uniform --start-time 12:34 --recorder-concurrency 3
+```
+
+Note that the destinations must be separate directories, as each
+process will assume it has full ownership of the files in that
+directory.
+
+A unified report can be generated from the two results by pass multiple `--source` switches to the `report` command:
+
+```
+lein run report --source file:///tmp/requestinator-test/results/markov --source file:///tmp/requestinator-test/results/uniform --destination file:///tmp/requestinator-test/reports
+```
+
+
 ## Architecture
 
 ### Execution

@@ -21,82 +21,85 @@
  ;; provided for #seconds, #minutes, and #hours.
  :requestinator/duration #seconds 30
  ;; An agent is an independent entity executing a sequence of
- ;; requests. Agents are organized into groups, each generating
- ;; requests using a particular model and running concurrently with
- ;; other groups.
+ ;; requests. Agents are organized into groups, keyed by an ID, and
+ ;; each generating requests using a particular model and running
+ ;; concurrently with other groups. Agent groups can be
+ ;; distributed across multiple executing processes - see the README
+ ;; for more details.
  :requestinator/agent-groups
- [{ ;; Three agents in this group
-   :requestinator.agent/count 3
-   ;; The tag is used to uniquely identify agent groups. It forms part
-   ;; of the path to the various files related to the agent in the
-   ;; underlying storage.
-   :requestinator.agent/tag "uniform"
-   ;; Schedulers implement RequestScheduler and are responsible for
-   ;; creating a timestamped sequence of requests based on some model.
-   ;; Currently, only uniform (randomly create requests against all of
-   ;; the endpoints in the Swagger doc) and markov schedulers (see
-   ;; below) are implemented.
-   :requestinator.agent/scheduler
-   #requestinator.scheduler/uniform
-   { ;; Generate requests with an Erlang-distributed interarrival time,
-    ;; with a mean of 1 second
-    :interarrival #seconds 1}}
-  {:requestinator.agent/count 5
-   :requestinator.agent/tag "markov"
-   :requestinator.agent/scheduler
-   #requestinator.scheduler/markov
-   ;; The Markov scheduler uses
-   ;; causatum (https://github.com/candera/causatum) to generate
-   ;; requests from a first-order Markov model of agent behavior.
-   { ;; The graph describes the sequence of states the agents will move
-    ;; through. Agents always start in a state called `:start`. The
-    ;; format used is currently precisely the format used by causatum
-    ;; graphs. `constant` and `erlang` delay operations are currently
-    ;; supported.
-    :graph    {:start           [{:query-by-status {:weight 1
-                                                    :delay (constant #seconds 1)}
-                                  :query-by-tags   {:weight 1
-                                                    :delay (constant #seconds 2)}}]
-               :query-by-status [{:pet-by-id     {:weight 1
-                                                  :delay  (erlang #seconds 10)}
-                                  :query-by-tags {:weight 1
-                                                  :delay  (erlang #seconds 10)}}]
-               :query-by-tags   [{:pet-by-id {:weight 1
-                                              :delay  (erlang #seconds 10)}}]}
-    ;; Request params specify how states from the graph above turn
-    ;; into actual requests. Any states that do not have an entry in
-    ;; the requests map will be skipped, but subsequent states will
-    ;; still be generated. This allows "parking" states.
-    :request-params {:query-by-status { ;; Path and method are the keys into
-                                       ;; the Swagger document for the
-                                       ;; endpoint the request will be made
-                                       ;; against. If either are not
-                                       ;; present, a selection will be made
-                                       ;; randomly from all the available
-                                       ;; choices.
-                                       :path "/pet/findByStatus"
-                                       :method "get"
-                                       ;; Parameters can be overriden by
-                                       ;; literal values, or by dynamic
-                                       ;; expressions (see below).
-                                       :param-overrides {"status" ["available"]}}
-                     :query-by-tags   {:path "/pet/findByTags"
-                                       :method "get"
-                                       :param-overrides {"tags" ["tag1"]}
-                                       ;; We can "store" facts from the
-                                       ;; actual requests and responses
-                                       ;; under keys. This memory is
-                                       ;; agent-local. Currently, only
-                                       ;; `response-body-json` is supported.
-                                       ;; It takes a JSON pointer and stores
-                                       ;; the data found there in the body.
-                                       :store {"pet-id" (response-body-json "#/0/id")}}
-                     :pet-by-id       {:path   "/pet/{petId}"
-                                       :method "get"
-                                       ;; Parameters can be overridden by
-                                       ;; previous-stored value via a
-                                       ;; `recall`, which takes a key and
-                                       ;; a default value to use if no
-                                       ;; value has yet been stored.
-                                       :param-overrides {"petId" #requestinator/recall ["pet-id" 42]}}}}}]}
+ {"uniform" { ;; Three agents in this group
+             :requestinator.agent/count 3
+             ;; The tag is used to uniquely identify agent groups. It forms part
+             ;; of the path to the various files related to the agent in the
+             ;; underlying storage.
+             :requestinator.agent/tag "uniform"
+             ;; Schedulers implement RequestScheduler and are responsible for
+             ;; creating a timestamped sequence of requests based on some model.
+             ;; Currently, only uniform (randomly create requests against all of
+             ;; the endpoints in the Swagger doc) and markov schedulers (see
+             ;; below) are implemented.
+             :requestinator.agent/scheduler
+             #requestinator.scheduler/uniform
+             { ;; Generate requests with an Erlang-distributed interarrival time,
+              ;; with a mean of 1 second
+              :interarrival #seconds 1}}
+  "markov"  {:requestinator.agent/count 5
+             :requestinator.agent/tag "markov"
+             :requestinator.agent/scheduler
+             #requestinator.scheduler/markov
+             ;; The Markov scheduler uses
+             ;; causatum (https://github.com/candera/causatum) to generate
+             ;; requests from a first-order Markov model of agent behavior.
+             { ;; The graph describes the sequence of states the agents will move
+              ;; through. Agents always start in a state called `:start`. The
+              ;; format used is currently precisely the format used by causatum
+              ;; graphs. `constant` and `erlang` delay operations are currently
+              ;; supported.
+              :graph    {:start           [{:query-by-status {:weight 1
+                                                              :delay (constant #seconds 1)}
+                                            :query-by-tags   {:weight 1
+                                                              :delay (constant #seconds 2)}}]
+                         :query-by-status [{:pet-by-id     {:weight 1
+                                                            :delay  (erlang #seconds 10)}
+                                            :query-by-tags {:weight 1
+                                                            :delay  (erlang #seconds 10)}}]
+                         :query-by-tags   [{:pet-by-id {:weight 1
+                                                        :delay  (erlang #seconds 10)}}]}
+              ;; Request params specify how states from the graph above turn
+              ;; into actual requests. Any states that do not have an entry in
+              ;; the requests map will be skipped, but subsequent states will
+              ;; still be generated. This allows "parking" states.
+              :request-params {:query-by-status { ;; Path and method are the keys into
+                                                 ;; the Swagger document for the
+                                                 ;; endpoint the request will be made
+                                                 ;; against. If either are not
+                                                 ;; present, a selection will be made
+                                                 ;; randomly from all the available
+                                                 ;; choices.
+                                                 :path "/pet/findByStatus"
+                                                 :method "get"
+                                                 ;; Parameters can be overriden by
+                                                 ;; literal values, or by dynamic
+                                                 ;; expressions (see below).
+                                                 :param-overrides {"status" ["available"]}}
+                               :query-by-tags   {:path "/pet/findByTags"
+                                                 :method "get"
+                                                 :param-overrides {"tags" ["tag1"]}
+                                                 ;; We can "store" facts from the
+                                                 ;; actual requests and responses
+                                                 ;; under keys. This memory is
+                                                 ;; agent-local. Currently, only
+                                                 ;; `response-body-json` is supported.
+                                                 ;; It takes a JSON pointer and stores
+                                                 ;; the data found there in the body.
+                                                 :store {"pet-id" (response-body-json "#/0/id")}}
+                               :pet-by-id       {:path   "/pet/{petId}"
+                                                 :method "get"
+                                                 ;; Parameters can be overridden by
+                                                 ;; previous-stored value via a
+                                                 ;; `recall`, which takes a key and
+                                                 ;; a default value to use if no
+                                                 ;; value has yet been stored.
+                                                 :param-overrides {"petId" #requestinator/recall
+                                                                   ["pet-id" 42]}}}}}}}
 

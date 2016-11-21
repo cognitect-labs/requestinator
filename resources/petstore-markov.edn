@@ -9,20 +9,20 @@
    :requestinator.agent/tag "markov"
    :requestinator.agent/scheduler
    #requestinator.scheduler/markov
-   {:request-params {:query-by-status {:path "/pet/findByStatus"
+   {:graph          {:start           [{:query-by-status {:weight 1
+                                                          :delay (constant #seconds 1)}
+                                        :query-by-tags   {:weight 1
+                                                          :delay (constant #seconds 2)}}]
+                     :query-by-status [{:pet-by-id     {:weight 1
+                                                        :delay  (erlang #seconds 10)}
+                                        :query-by-tags {:weight 1
+                                                        :delay  (erlang #seconds 10)}}]
+                     :query-by-tags   [{:pet-by-id {:weight 1
+                                                    :delay  (erlang #seconds 10)}}]}
+    :request-params {:query-by-status {:path "/pet/findByStatus"
                                        :method "get"}
                      :query-by-tags   {:path "/pet/findByTags"
                                        :method "get"}
                      :pet-by-id       {:path   "/pet/{petId}"
-                                       :method "get"}}
-    :graph    {:start           [{:query-by-status {:weight 1
-                                                    :delay (constant #seconds 1)}
-                                  :query-by-tags   {:weight 1
-                                                    :delay (constant #seconds 2)}}]
-               :query-by-status [{:pet-by-id     {:weight 1
-                                                  :delay  (erlang #seconds 10)}
-                                  :query-by-tags {:weight 1
-                                                  :delay  (erlang #seconds 10)}}]
-               :query-by-tags   [{:pet-by-id {:weight 1
-                                              :delay  (erlang #seconds 10)}}]}}}]}
+                                       :method "get"}}}}]}
 
