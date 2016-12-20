@@ -1,0 +1,33 @@
+ruby:
+  ext: ['.rb', '.rake']
+  after: ['^#!', '^#.*encoding:']
+  comment:
+    open:   '#\n'
+    close:  '#\n'
+    prefix: '# '
+
+clojure:
+  ext: ['.clj', '.edn', '.cljs']
+  comment:
+    prefix: ';; '
+
+properties:
+  ext: ['.properties']
+  comment:
+    prefix: '# '
+
+css:
+  ext: ['.css']
+  comment:
+    open:   '/*\n'
+    close:  ' */\n\n'
+    prefix: ' * '
+
+# Most shells, really
+shell:
+  ext:  ['.sh']
+  after: ['^#!']
+  comment:
+    open:   '#\n'
+    close:  '#\n'
+    prefix: '# '

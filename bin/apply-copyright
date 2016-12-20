@@ -1,0 +1,2 @@
+#! /usr/bin/env bash
+copyright-header --add-path . -c etc/syntax.yml --license-file etc/epl-header.txt --output-dir .

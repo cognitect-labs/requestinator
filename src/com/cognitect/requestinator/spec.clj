@@ -1,3 +1,11 @@
+;; Copyright (c) 2016 Cognitect, Inc.
+;;
+;; This file is part of Requestinator.
+;;
+;; All rights reserved. This program and the accompanying materials
+;; are made available under the terms of the Eclipse Public License v1.0
+;; which accompanies this distribution, and is available at
+;; http://www.eclipse.org/legal/epl-v10.html
 (ns com.cognitect.requestinator.spec
   "A library that defines a set of operations for mapping specs to
   requests. This happens in two steps. First, a spec is used to

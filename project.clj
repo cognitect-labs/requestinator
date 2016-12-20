@@ -1,3 +1,11 @@
+;; Copyright (c) 2016 Cognitect, Inc.
+;;
+;; This file is part of Requestinator.
+;;
+;; All rights reserved. This program and the accompanying materials
+;; are made available under the terms of the Eclipse Public License v1.0
+;; which accompanies this distribution, and is available at
+;; http://www.eclipse.org/legal/epl-v10.html
 (defproject requestinator "0.1.0-SNAPSHOT"
   :dependencies [[org.clojure/clojure "1.9.0-alpha13"]
                  [org.clojure/clojurescript "1.9.229"]
